@@ -1,0 +1,16 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# ---- Envs / secrets ----
+.env
+
+# ---- Poetry / venv ----
+.venv/
+
+# ---- OS / editor ----
+.DS_Store
+.vscode/
