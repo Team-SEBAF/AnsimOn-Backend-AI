@@ -8,7 +8,6 @@ from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column
 from sqlalchemy.sql import func
 
-# Base = 모든 모델의 기본 클래스
 Base = declarative_base()
 
 
