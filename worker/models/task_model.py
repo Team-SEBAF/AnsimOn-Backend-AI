@@ -5,10 +5,10 @@ from uuid import UUID, uuid4
 from sqlalchemy import DateTime, ForeignKey, Integer
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
-from sqlalchemy.orm import Mapped, declarative_base, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
-Base = declarative_base()
+from worker.models.base import Base
 
 
 class TaskType(str, Enum):

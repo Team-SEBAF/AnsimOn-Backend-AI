@@ -3,9 +3,9 @@ from uuid import UUID, uuid4
 from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
-from sqlalchemy.orm import Mapped, declarative_base, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 
-Base = declarative_base()
+from worker.models.base import Base
 
 
 class Timeline(Base):
