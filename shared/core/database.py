@@ -19,15 +19,3 @@ SessionLocal = sessionmaker(
     autoflush=False,
     bind=engine,
 )
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    except Exception as e:
-        # 에러 발생시 트랜잭션 롤백
-        db.rollback()
-        raise e
-    finally:
-        db.close()

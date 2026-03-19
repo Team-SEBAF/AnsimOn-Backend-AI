@@ -3,13 +3,21 @@ from botocore.exceptions import ClientError
 
 from shared.core.settings import settings
 
+_s3_client = None
+_sqs_client = None
+
 
 def get_s3_client():
-    return boto3.client(
-        "s3",
-        region_name=settings.AWS_REGION,
-        endpoint_url=f"https://s3.{settings.AWS_REGION}.amazonaws.com",
-    )
+    global _s3_client
+
+    if _s3_client is None:
+        _s3_client = boto3.client(
+            "s3",
+            region_name=settings.AWS_REGION,
+            endpoint_url=f"https://s3.{settings.AWS_REGION}.amazonaws.com",
+        )
+
+    return _s3_client
 
 
 def download_s3_object(bucket: str, key: str) -> bytes:
@@ -46,7 +54,12 @@ def head_s3_object(bucket: str, key: str) -> dict | None:
 
 
 def get_sqs_client():
-    return boto3.client(
-        "sqs",
-        region_name=settings.AWS_REGION,
-    )
+    global _sqs_client
+
+    if _sqs_client is None:
+        _sqs_client = boto3.client(
+            "sqs",
+            region_name=settings.AWS_REGION,
+        )
+
+    return _sqs_client
