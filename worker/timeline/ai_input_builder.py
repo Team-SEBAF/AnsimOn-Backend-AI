@@ -237,8 +237,22 @@ def build_ai_input(db: Session, complaint_id) -> TimelinePrototypeAiInput:
     all_evidences.extend(_build_evidence_incident_logs(db, complaint_id))
 
     all_evidences.sort(key=lambda x: x[0])
-    evidences = [ev for _, ev, _ in all_evidences]
-    s3_keys = [s3 for _, _, s3 in all_evidences]
+    print("all_evidences:", [(ev.type, ev.evidence_id) for _, ev, _ in all_evidences])
+
+    # local: 타입별 첫 번째만 사용
+    if settings.env == "local":
+        seen_types: set[str] = set()
+        evidences_to_use: list[tuple[float, TimelinePrototypeEvidenceInput, str | None]] = []
+        for item in all_evidences:
+            ev = item[1]
+            if ev.type not in seen_types:
+                seen_types.add(ev.type)
+                evidences_to_use.append(item)
+    else:
+        evidences_to_use = all_evidences
+
+    evidences = [ev for _, ev, _ in evidences_to_use]
+    s3_keys = [s3 for _, _, s3 in evidences_to_use]
 
     # S3 다운로드가 필요한 evidences (s3_key가 있는 것)
     to_download = [(i, s3) for i, s3 in enumerate(s3_keys) if s3 is not None]

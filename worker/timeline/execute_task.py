@@ -2,6 +2,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from shared.core.settings import settings
 from worker.models.task_model import Task
 from worker.timeline.ai_input_builder import build_ai_input
 
@@ -19,10 +20,15 @@ def execute_timeline_task(task: Task, db: Session) -> None:
 
     ai_input = build_ai_input(db, complaint_id)
 
-    from ansimon_ai.llm.mock import MockLLMClient  # noqa: E402
+    from ansimon_ai.llm.openai_client import OpenAILLMClient  # noqa: E402
     from ansimon_ai.timeline import build_timeline_prototype  # noqa: E402
 
-    llm_client = MockLLMClient()
+    logger.info("타임라인 프로토타입 실행 시작 (task_id: %s)", task.id)
+
+    llm_client = OpenAILLMClient(
+        api_key=settings.OPENAI_API_KEY,
+        model=settings.OPENAI_MODEL,
+    )
     output = build_timeline_prototype(ai_input, llm_client=llm_client)
 
     logger.info(

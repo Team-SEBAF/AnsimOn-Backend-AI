@@ -51,7 +51,7 @@ def process_message(
         task.started_at = datetime.now(timezone.utc)
         db.commit()
 
-        # 2. AI 실행 + 결과 저장 (콜백으로 전달받음)
+        # 2. AI 실행 + 결과 저장
         execute_task(task, db)  # execute_task 안에서 task.status 변경 하지 않기
 
         # 3. 상태 변경 (DONE)
