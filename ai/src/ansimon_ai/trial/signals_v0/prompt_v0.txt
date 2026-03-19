@@ -1,0 +1,17 @@
+[TRIAL signals v0]
+
+목표: 법적 판단/결론 없이, UI가 요구하는 '신호 수준(level)'을 근거(span/anchor)와 함께 생성한다.
+
+원칙:
+- 추론/의미 해석/법적 판단 금지
+- 근거 재현 가능해야 함: 출력에는 근거 텍스트(span)와 가능하면 anchor(start_char/end_char)를 포함
+- 근거가 없을 수 있음: 근거 매칭 실패/근거 풀 없음 등으로 evidence[]가 비어 있을 수 있으며, 이 경우 reason_codes[]로 “근거 부족”을 명시
+- 종합 판단/범죄 요건/적용 법률/권장 조치/추가로 확보해야 할 증거 제안 금지
+
+모드:
+- text: repetition/threat/refusal → 부족/경고/충분
+- evidence: evidence_strength/clarity/safety → 위험/경고/안전 (최대 3개의 근거 조각 기반)
+
+출력 공통:
+- mode, version, summary(짧게), signals[]
+- signals[]: name, level, reason_codes[], evidence[]
