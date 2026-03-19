@@ -37,11 +37,15 @@ def build_timeline_event_evidences(evidences: List[Dict[str, Any]]) -> List[Dict
                 "description": ev.get("description", ""),
                 "tags": list(ev.get("tags", [])),
                 "referenced_evidence_count": 1,
+                "referenced_evidence_ids": [ev.get("evidence_id")],
             }
         else:
             grouped[key]["referenced_evidence_count"] += 1
             tag_set = set(grouped[key]["tags"]) | set(ev.get("tags", []))
             grouped[key]["tags"] = sorted(tag_set)
+            evidence_id = ev.get("evidence_id")
+            if evidence_id not in grouped[key]["referenced_evidence_ids"]:
+                grouped[key]["referenced_evidence_ids"].append(evidence_id)
 
     sorted_items = sorted(
         grouped.values(),

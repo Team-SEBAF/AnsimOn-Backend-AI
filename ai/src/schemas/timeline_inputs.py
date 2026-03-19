@@ -47,7 +47,7 @@ class TimelinePrototypeEvidenceInput(BaseModel):
     type: EvidenceType
     file_format: Optional[FileFormat] = None
     file_name: Optional[str] = None
-    s3_key: Optional[str] = None
+    file_bytes: Optional[bytes] = None
     extracted_text: Optional[str] = None
     incident_log_form: Optional[IncidentLogFormInput] = None
 
@@ -76,6 +76,7 @@ class TimelineEvidenceItem(BaseModel):
     description: str
     tags: List[TimelineTagType]
     referenced_evidence_count: int
+    referenced_evidence_ids: List[UUID] = Field(default_factory=list)
 
 class TimelineEvent(BaseModel):
     time: str

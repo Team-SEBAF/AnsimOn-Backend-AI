@@ -1,6 +1,5 @@
 from typing import List, Literal, Optional
 from uuid import UUID
-
 from pydantic import BaseModel
 
 class EvidenceRequest(BaseModel):
@@ -31,6 +30,7 @@ class TimelineEvidence(BaseModel):
     description: str
     tags: List[TagType]
     referenced_evidence_count: int
+    referenced_evidence_ids: List[UUID]
 
 class TimelineEvent(BaseModel):
     time: str
