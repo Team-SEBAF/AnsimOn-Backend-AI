@@ -4,9 +4,18 @@ import sys
 import time
 from pathlib import Path
 
-from shared.core.database import SessionLocal
-from worker.sqs_utils import delete_message, process_message, receive_messages
-from worker.timeline.execute_task import execute_timeline_task
+# 다른 import 전에 로깅 설정
+_root = logging.getLogger()
+_root.handlers.clear()
+_root.setLevel(logging.INFO)
+_h = logging.StreamHandler(sys.stderr)
+_h.setLevel(logging.INFO)
+_h.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+_root.addHandler(_h)
+
+from shared.core.database import SessionLocal  # noqa: E402
+from worker.sqs_utils import delete_message, process_message, receive_messages  # noqa: E402
+from worker.timeline.execute_task import execute_timeline_task  # noqa: E402
 
 # ai 모듈 import를 위해 path 추가 (main 진입 전 설정)
 _project_root = Path(__file__).resolve().parent.parent

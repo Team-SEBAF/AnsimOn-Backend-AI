@@ -237,17 +237,11 @@ def build_ai_input(db: Session, complaint_id) -> TimelinePrototypeAiInput:
     all_evidences.extend(_build_evidence_incident_logs(db, complaint_id))
 
     all_evidences.sort(key=lambda x: x[0])
-    print("all_evidences:", [(ev.type, ev.evidence_id) for _, ev, _ in all_evidences])
 
-    # local: 타입별 첫 번째만 사용
+    # local: MESSAGE 타입만 최대 3개 (테스트용)
     if settings.env == "local":
-        seen_types: set[str] = set()
-        evidences_to_use: list[tuple[float, TimelinePrototypeEvidenceInput, str | None]] = []
-        for item in all_evidences:
-            ev = item[1]
-            if ev.type not in seen_types:
-                seen_types.add(ev.type)
-                evidences_to_use.append(item)
+        messages_only = [x for x in all_evidences if x[1].type == "MESSAGE"]
+        evidences_to_use = messages_only[:3]
     else:
         evidences_to_use = all_evidences
 
