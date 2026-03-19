@@ -50,9 +50,9 @@ class TimelineEvidenceItem(BaseModel):
     index: int
     title: str
     description: str
-    tags: list[Literal["repeat", "physical", "threat", "sexual_insult", "refusal"]]
-    referenced_evidence_count: int
-    referenced_evidence_ids: list[UUID]
+    tags: list[Literal["repeat", "physical", "threat", "sexual_insult", "refusal"]] = []
+    referenced_evidence_count: int = 1
+    referenced_evidence_ids: list[UUID] = []
 
 
 class TimelineEvent(BaseModel):

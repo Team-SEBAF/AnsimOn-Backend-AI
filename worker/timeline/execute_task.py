@@ -1,9 +1,12 @@
+import json
 import logging
 
 from sqlalchemy.orm import Session
 
-from worker.models.task_model import Task
+# from shared.core.settings import settings
+from worker.models import Task
 from worker.timeline.ai_input_builder import build_ai_input
+from worker.timeline.schemas import TimelinePrototypeOutput
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +47,11 @@ def execute_timeline_task(task: Task, db: Session) -> None:
             r.error_message,
         )
 
+    dumped = output.model_dump(mode="json")
+    result = TimelinePrototypeOutput.model_validate(dumped)
     logger.info(
-        "타임라인 프로토타입 완료 (complaint_id: %s, items: %d)",
+        "타임라인 프로토타입 완료 (complaint_id: %s): %s",
         complaint_id,
-        len(output.items),
+        json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2),
     )
     # TODO: output을 DB에 저장

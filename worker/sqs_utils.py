@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from shared.core.aws import get_sqs_client
 from shared.core.settings import settings
-from worker.models.task_model import Task, TaskStatus
+from worker.models import Task, TaskStatus
 
 logger = logging.getLogger(__name__)
 
