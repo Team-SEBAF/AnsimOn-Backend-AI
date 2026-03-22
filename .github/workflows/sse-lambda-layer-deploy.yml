@@ -1,4 +1,4 @@
-name: Deploy Lambda Layer
+name: SSE Deploy Lambda Layer
 
 on:
   workflow_dispatch:
