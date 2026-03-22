@@ -2,6 +2,7 @@ import json
 import logging
 import sys
 import time
+from functools import partial
 from pathlib import Path
 
 # 다른 import 전에 로깅 설정
@@ -44,7 +45,8 @@ def worker_loop():
 
             try:
                 if body.get("type") == "timeline":
-                    execute_task = execute_timeline_task
+                    llm_type = body.get("llm_type", "mock")
+                    execute_task = partial(execute_timeline_task, llm_type=llm_type)
 
                 elif body.get("type") == "document":
 

@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey, Integer
 from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -49,7 +50,14 @@ class Task(Base):
         ForeignKey("complaints.complaint_id", ondelete="CASCADE"),
         nullable=False,
     )
-    retry_count: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    processed_evidence_count: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="처리된 증거수"
+    )
+    total_evidence_count: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="총 증거수"
+    )
+    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
