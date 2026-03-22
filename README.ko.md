@@ -39,10 +39,14 @@ poetry --version
 프로젝트 루트에서:
 
 ```bash
+# SSE만
 poetry install
+
+# 전체 (AI Worker + SSE)
+poetry install -E worker
 ```
 
-Poetry가 가상환경을 만들고 `pyproject.toml` 기준으로 의존성을 설치합니다.
+Poetry가 가상환경을 만듭니다. `worker` extra는 AI 의존성(openai, pytesseract 등)을 추가합니다.
 
 ---
 
