@@ -20,9 +20,9 @@ dependencies = [
     "boto3 (>=1.42.70,<2.0.0)",
     "mangum (>=0.21.0,<0.22.0)",
     # AI 모듈 (timeline 등) 의존성
-    "python-docx>=1.1.0",
-    "python-dotenv>=1.0.0",
     "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "python-docx>=1.1.0",
     "pytesseract>=0.3.10",
     "Pillow>=10.0.0",
     "pdfplumber>=0.10.0",
