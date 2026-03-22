@@ -3,7 +3,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from worker.models import Task
+from shared.models import Task
 from worker.timeline.ai_input_builder import build_ai_input
 from worker.timeline.schemas import TimelinePrototypeOutput
 

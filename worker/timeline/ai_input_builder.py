@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from shared.core.aws import download_s3_object
 from shared.core.settings import settings
-from worker.models.evidences_model import (
+from shared.models.evidences_model import (
     EvidenceIncidentLog,
     EvidenceIncidentLogFile,
     EvidenceIncidentLogFormData,
