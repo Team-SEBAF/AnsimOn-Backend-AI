@@ -33,8 +33,22 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
         llm_client = MockLLMClient()
 
     # 3. 타임라인 프로토타입 실행
+    total = len(ai_input.evidences)
+    task.total_evidence_count = total
+    task.processed_evidence_count = 0
+    db.commit()
+
+    def _on_progress(processed: int, total_count: int) -> None:
+        task.processed_evidence_count = processed
+        db.commit()
+        logger.info("증거 처리 진행 (task_id: %s): (%d/%d)", task.id, processed, total_count)
+
     logger.info("타임라인 프로토타입 실행 시작 (task_id: %s) (llm_type: %s)", task.id, llm_type)
-    output = build_timeline_prototype(ai_input, llm_client=llm_client)
+    output = build_timeline_prototype(
+        ai_input,
+        llm_client=llm_client,
+        progress_callback=_on_progress,
+    )
 
     # 4. 증거 결과 로깅
     for r in output.evidence_results:
