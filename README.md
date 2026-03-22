@@ -39,10 +39,14 @@ poetry --version
 At the project root:
 
 ```bash
+# SSE only
 poetry install
+
+# Full (AI Worker + SSE)
+poetry install -E worker
 ```
 
-Poetry creates and manages the virtual environment and installs dependencies from `pyproject.toml`.
+Poetry creates and manages the virtual environment. The `worker` extra adds AI dependencies (openai, pytesseract, etc.).
 
 ---
 
