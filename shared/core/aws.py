@@ -3,6 +3,10 @@ from botocore.exceptions import ClientError
 
 from shared.core.settings import settings
 
+# .env의 AWS_PROFILE로 이 프로젝트에서 사용할 프로필 고정
+if settings.AWS_PROFILE:
+    boto3.setup_default_session(profile_name=settings.AWS_PROFILE)
+
 _s3_client = None
 _sqs_client = None
 

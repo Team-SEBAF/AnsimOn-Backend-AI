@@ -33,5 +33,8 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str | None = None
     SQS_QUEUE_URL: str | None = None
 
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-4o-mini"
+
 
 settings = Settings()

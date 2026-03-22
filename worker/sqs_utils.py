@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from shared.core.aws import get_sqs_client
 from shared.core.settings import settings
-from worker.models.task_model import Task, TaskStatus
+from worker.models import Task, TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def process_message(
         task.started_at = datetime.now(timezone.utc)
         db.commit()
 
-        # 2. AI 실행 + 결과 저장 (콜백으로 전달받음)
+        # 2. AI 실행 + 결과 저장
         execute_task(task, db)  # execute_task 안에서 task.status 변경 하지 않기
 
         # 3. 상태 변경 (DONE)
@@ -63,7 +63,7 @@ def process_message(
         return True
 
     except Exception as e:
-        logger.exception("태스크 처리 도중 에러가 발생했습니다. (task_id: %s)", task_id, e)
+        logger.exception("태스크 처리 도중 에러가 발생했습니다. (task_id: %s): %s", task_id, e)
         db.rollback()
         task.retry_count += 1
 
@@ -75,8 +75,9 @@ def process_message(
             return True  # 더 이상 재시도 안 함 → 삭제
 
         else:
+            task.status = TaskStatus.PENDING  # 재시도 시 idempotency 통과하도록
             logger.warning(
-                "재시도 예정 (%d/3) (task_id: %s)",
+                "실패 (%d/3) - 메시지 유지, 다음 폴링 시 재시도 (task_id: %s)",
                 task.retry_count,
                 task_id,
             )
