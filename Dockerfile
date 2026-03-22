@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
 # 의존성만 먼저 설치 (캐시 활용)
 COPY pyproject.toml poetry.lock ./
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction --no-ansi
+    && poetry install --no-dev --no-interaction --no-ansi -E worker
 
 # AI 모듈 클론 (별도 레포)
 RUN git clone --depth 1 https://github.com/Team-SEBAF/AnsimOn-AI.git ai_temp \

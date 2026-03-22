@@ -4,7 +4,7 @@ from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
-from worker.models.base import Base
+from shared.models.base import Base
 
 
 class User(Base):

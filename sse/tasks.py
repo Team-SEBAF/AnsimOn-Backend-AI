@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from shared.core.database import SessionLocal
-from worker.models import Task, TaskStatus
+from shared.models import Task, TaskStatus
 
 router = APIRouter(tags=["SSE Progress Stream"])
 

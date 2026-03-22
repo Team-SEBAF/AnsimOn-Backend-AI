@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
-from worker.models.base import Base
+from shared.models.base import Base
 
 
 class TaskType(str, Enum):
