@@ -3320,4 +3320,4 @@ worker = ["Pillow", "openai", "openai-whisper", "pdf2image", "pdfplumber", "pyte
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.12"
-content-hash = "a5add5615d656dcbd1eb9234520a5b2bb13f2770de6c37c88e919f1a34dfaf95"
+content-hash = "9b2a4ea11626d12b942b2235fde8c043fc0731d1eeec616b0146cabe8450b271"
