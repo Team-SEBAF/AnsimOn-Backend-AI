@@ -14,8 +14,8 @@ from ansimon_ai.structuring.tags.generate import generate_evidence_tags
 from ansimon_ai.structuring.tags.types import EvidenceTag
 from ansimon_ai.trial.signals_v0.cache_manager import get_or_create_trial_signals_v0_from_structuring
 
-SCHEMA_VERSION = "v1.3"
-PROMPT_VERSION = "v1.0"
+SCHEMA_VERSION = "v1.5"
+PROMPT_VERSION = "v1.2"
 
 def run_structuring_pipeline(
         *,
@@ -25,7 +25,6 @@ def run_structuring_pipeline(
         validator,
         cache: Optional[object] = None,
 ) -> StructuringResult:
-    # 1. cache check
     cache_hit = False
     cached_output = None
     cache_key = None
@@ -41,7 +40,6 @@ def run_structuring_pipeline(
         if cached_output is not None:
             cache_hit = True
 
-    # 2. LLM call (구조화)
     if cached_output is None:
         output_json = call_structuring_ai(
             struct_input=input,
@@ -53,7 +51,6 @@ def run_structuring_pipeline(
     else:
         output_json = cached_output
     
-    # 3. anchor matching & apply
     anchored_json = apply_anchors(
         structuring_result=output_json,
         full_text=input.full_text,
@@ -80,7 +77,6 @@ def run_structuring_pipeline(
         notes=None,
     )
 
-    # 4. anchor store (분리 저장)
     if cache_key is not None:
         save_anchors(
             anchors=anchors,
@@ -88,7 +84,6 @@ def run_structuring_pipeline(
             input_hash=cache_key,
         )
 
-    # 5. validation
     raw_validation = validator.validate(anchored_json)
 
     validation_result = ValidationResult(
@@ -97,7 +92,6 @@ def run_structuring_pipeline(
         message=raw_validation.get("message"),
     )
 
-    # 6. collect result
     result = StructuringResult(
         output_json=anchored_json,
         cache_hit=cache_hit,

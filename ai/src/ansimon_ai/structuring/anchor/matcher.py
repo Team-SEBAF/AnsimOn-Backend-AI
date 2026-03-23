@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Any, Optional, List
 import unicodedata
 
 @dataclass(frozen=True)
@@ -12,9 +12,9 @@ class AnchorMatcher:
         self,
         *,
         full_text: str,
-        evidence_span: Optional[str],
+        evidence_span: Optional[Any],
     ) -> Optional[EvidenceAnchor]:
-        if not evidence_span:
+        if not evidence_span or not isinstance(evidence_span, str):
             return None
 
         full = unicodedata.normalize("NFC", full_text)

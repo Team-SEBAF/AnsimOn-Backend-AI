@@ -16,10 +16,11 @@ def apply_anchors(
 
     def walk(node: Any) -> None:
         if isinstance(node, dict):
-            if "evidence_span" in node and node["evidence_span"]:
+            evidence_span = node.get("evidence_span")
+            if isinstance(evidence_span, str) and evidence_span:
                 anchor: EvidenceAnchor | None = matcher.match(
                     full_text=normalized_full_text,
-                    evidence_span=node["evidence_span"],
+                    evidence_span=evidence_span,
                 )
 
                 if anchor is None:
@@ -30,6 +31,9 @@ def apply_anchors(
                         "start_char": anchor.start_char,
                         "end_char": anchor.end_char,
                     }
+
+            elif "evidence_span" in node and evidence_span:
+                node["evidence_anchor"] = None
 
             for value in node.values():
                 walk(value)

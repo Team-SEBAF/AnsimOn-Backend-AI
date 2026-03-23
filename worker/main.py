@@ -5,6 +5,12 @@ import time
 from functools import partial
 from pathlib import Path
 
+# ai 모듈(schemas, ansimon_ai 등) import를 위해 path 추가 (다른 import보다 먼저)
+_project_root = Path(__file__).resolve().parent.parent
+_ai_src = _project_root / "ai" / "src"
+if _ai_src.exists():
+    sys.path.insert(0, str(_ai_src))
+
 # 다른 import 전에 로깅 설정
 _root = logging.getLogger()
 _root.handlers.clear()
@@ -17,13 +23,6 @@ _root.addHandler(_h)
 from shared.core.database import SessionLocal  # noqa: E402
 from worker.sqs_utils import delete_message, process_message, receive_messages  # noqa: E402
 from worker.timeline.execute_task import execute_timeline_task  # noqa: E402
-
-# ai 모듈 import를 위해 path 추가 (main 진입 전 설정)
-_project_root = Path(__file__).resolve().parent.parent
-_ai_src = _project_root / "ai" / "src"
-if _ai_src.exists():
-    sys.path.insert(0, str(_ai_src))
-
 
 logger = logging.getLogger(__name__)
 
