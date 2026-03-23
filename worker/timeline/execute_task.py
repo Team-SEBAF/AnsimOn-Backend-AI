@@ -1,11 +1,11 @@
 import json
 import logging
 
+from schemas.timeline_inputs import TimelinePrototypeOutput
 from sqlalchemy.orm import Session
 
 from shared.models import Task
 from worker.timeline.ai_input_builder import build_ai_input
-from worker.timeline.schemas import TimelinePrototypeOutput
 
 logger = logging.getLogger(__name__)
 
