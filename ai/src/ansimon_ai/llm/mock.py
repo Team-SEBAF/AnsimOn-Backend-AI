@@ -1,4 +1,5 @@
 import json
+
 from .base import LLMClient
 
 class MockLLMClient(LLMClient):
@@ -32,10 +33,10 @@ class MockLLMClient(LLMClient):
                 "evidence_anchor": None,
             },
             "frequency": {
-            "value": "거의 매일",
-            "confidence": "high",
-            "evidence_span": "거의 매일",
-            "evidence_anchor": None
+                "value": "거의 매일",
+                "confidence": "high",
+                "evidence_span": "거의 매일",
+                "evidence_anchor": None,
             },
             "channel": {
                 "value": ["unknown"],
@@ -76,6 +77,21 @@ class MockLLMClient(LLMClient):
             "report_or_record": {
                 "value": "unknown",
                 "confidence": "low",
+                "evidence_span": None,
+                "evidence_anchor": None,
+            },
+            "tags": {
+                "value": ["repeat"],
+                "confidence": "medium",
+                "evidence_span": None,
+                "evidence_anchor": None,
+            },
+            "timeline_summary": {
+                "value": {
+                    "title": "반복 연락 정황",
+                    "description": "반복적인 연락 또는 접근 정황이 포함된 증거입니다.",
+                },
+                "confidence": "medium",
                 "evidence_span": None,
                 "evidence_anchor": None,
             },
