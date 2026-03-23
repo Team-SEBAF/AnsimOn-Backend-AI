@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 import shutil
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -12,7 +13,7 @@ from ansimon_ai.structuring.anchor.matcher import AnchorMatcher
 from ansimon_ai.structuring.from_stt import build_structuring_input_from_stt
 from ansimon_ai.structuring.from_text import build_structuring_input_from_text
 from ansimon_ai.structuring.run import run_structuring_pipeline
-from ansimon_ai.structuring.tag_patterns import extract_tags_from_structuring_input
+from ansimon_ai.structuring.timestamp_utils import extract_timestamp
 from ansimon_ai.structuring.types import StructuringInput
 
 from .grouping import bucket_evidences_by_date_time, build_timeline_event_evidences
@@ -172,10 +173,16 @@ def process_single_evidence(
             )
 
         normalized_text = struct_input.full_text.strip()
-        title = _build_title(evidence)
-        description = _build_description(evidence, normalized_text)
-        tags = extract_tags_from_structuring_input(struct_input)
+        title = _build_title(evidence, structuring_result.output_json)
+        description = _build_description(
+            evidence,
+            normalized_text,
+            structuring_result.output_json,
+        )
+        tags = _build_tags(structuring_result.output_json)
         timestamp = _extract_primary_timestamp(struct_input)
+        if timestamp is None:
+            timestamp = evidence.file_created_at
 
         return EvidenceProcessingResult(
             evidence_id=evidence.evidence_id,
@@ -207,7 +214,15 @@ def _prepare_structuring_input(
     if evidence.type == "INCIDENT_LOG":
         if evidence.incident_log_form is not None:
             text = _incident_log_to_text(evidence)
-            return build_structuring_input_from_text(text), "form"
+            struct_input = build_structuring_input_from_text(
+                text,
+                metadata_fallback_timestamp=_build_incident_log_form_timestamp(evidence),
+            )
+            form_timestamp = _build_incident_log_form_timestamp(evidence)
+            if form_timestamp is not None:
+                for segment in struct_input.segments:
+                    segment.timestamp = form_timestamp
+            return struct_input, "form"
 
     if evidence.extracted_text:
         return _prepare_structuring_input_from_extracted_text(evidence)
@@ -436,9 +451,45 @@ def _incident_log_to_text(evidence: TimelinePrototypeEvidenceInput) -> str:
     )
 
 
-def _build_title(evidence: TimelinePrototypeEvidenceInput) -> str:
+def _build_incident_log_form_timestamp(
+    evidence: TimelinePrototypeEvidenceInput,
+) -> Optional[datetime]:
+    form = evidence.incident_log_form
+    if form is None:
+        return None
+
+    date_str = form.date.strip()
+    time_str = form.time.strip()
+    if not date_str:
+        return None
+
+    if time_str:
+        for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+            try:
+                return datetime.strptime(f"{date_str} {time_str}", fmt)
+            except ValueError:
+                pass
+
+    for fmt in ("%Y-%m-%d",):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            pass
+
+    return None
+
+
+def _build_title(
+    evidence: TimelinePrototypeEvidenceInput,
+    structured_data: Optional[dict] = None,
+) -> str:
     if evidence.type == "INCIDENT_LOG" and evidence.incident_log_form is not None:
         return evidence.incident_log_form.title
+
+    summary = _extract_timeline_summary(structured_data)
+    summary_title = summary.get("title")
+    if isinstance(summary_title, str) and summary_title.strip():
+        return summary_title.strip()
 
     mapping = {
         "MESSAGE": "메신저/문자 증거",
@@ -452,9 +503,15 @@ def _build_title(evidence: TimelinePrototypeEvidenceInput) -> str:
 def _build_description(
     evidence: TimelinePrototypeEvidenceInput,
     normalized_text: str,
+    structured_data: Optional[dict] = None,
     *,
     limit: int = 280,
 ) -> str:
+    summary = _extract_timeline_summary(structured_data)
+    summary_description = summary.get("description")
+    if isinstance(summary_description, str) and summary_description.strip():
+        return summary_description.strip()
+
     text = normalized_text.strip()
     if not text:
         fallback = evidence.file_name or str(evidence.evidence_id)
@@ -465,11 +522,57 @@ def _build_description(
     return f"{text[:limit].rstrip()}..."
 
 
+def _extract_timeline_summary(structured_data: Optional[dict]) -> dict:
+    if not isinstance(structured_data, dict):
+        return {}
+
+    summary = structured_data.get("timeline_summary")
+    if not isinstance(summary, dict):
+        return {}
+
+    value = summary.get("value")
+    if not isinstance(value, dict):
+        return {}
+
+    return value
+
+
+def _build_tags(structured_data: Optional[dict]) -> List[str]:
+    if not isinstance(structured_data, dict):
+        return []
+
+    tags_field = structured_data.get("tags")
+    if not isinstance(tags_field, dict):
+        return []
+
+    value = tags_field.get("value")
+    if not isinstance(value, list):
+        return []
+
+    allowed = {"repeat", "physical", "threat", "sexual_insult", "refusal"}
+    result: List[str] = []
+    for tag in value:
+        if isinstance(tag, str) and tag in allowed and tag not in result:
+            result.append(tag)
+    return result
+
+
 def _extract_primary_timestamp(struct_input: StructuringInput):
+    first_timestamp = None
     for segment in struct_input.segments:
         if segment.timestamp is not None:
-            return segment.timestamp
-    return None
+            if first_timestamp is None:
+                first_timestamp = segment.timestamp
+            if segment.timestamp.hour != 0 or segment.timestamp.minute != 0:
+                return segment.timestamp
+
+    full_text_timestamp = extract_timestamp(struct_input.full_text)
+    if full_text_timestamp is not None and (
+        full_text_timestamp.hour != 0 or full_text_timestamp.minute != 0
+    ):
+        return full_text_timestamp
+
+    return first_timestamp or full_text_timestamp
 
 
 def _assemble_timeline_items(

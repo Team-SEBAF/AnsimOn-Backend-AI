@@ -45,6 +45,7 @@ class TimelinePrototypeEvidenceInput(BaseModel):
     file_format: Optional[FileFormat] = None
     file_name: Optional[str] = None
     file_bytes: Optional[bytes] = None
+    file_created_at: Optional[datetime] = None
     extracted_text: Optional[str] = None
     incident_log_form: Optional[IncidentLogFormInput] = None
 

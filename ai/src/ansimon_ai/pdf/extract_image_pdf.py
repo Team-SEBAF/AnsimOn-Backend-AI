@@ -9,3 +9,13 @@ def extract_text_from_image_pdf(pdf_path: str, lang: str = "kor") -> List[str]:
         text = pytesseract.image_to_string(img, lang=lang)
         texts.append(text)
     return texts
+
+def extract_text_from_image_pdf_page(pdf_path: str, page_index: int, lang: str = "kor") -> str:
+    images = convert_from_path(
+        pdf_path,
+        first_page=page_index + 1,
+        last_page=page_index + 1,
+    )
+    if not images:
+        return ""
+    return pytesseract.image_to_string(images[0], lang=lang)

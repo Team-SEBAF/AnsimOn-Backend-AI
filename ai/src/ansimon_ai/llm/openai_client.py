@@ -2,7 +2,6 @@ import json
 import os
 from typing import Optional
 
-from dotenv import load_dotenv
 from .base import LLMClient
 
 class OpenAILLMClient(LLMClient):
@@ -13,7 +12,13 @@ class OpenAILLMClient(LLMClient):
         model: Optional[str] = None,
         base_url: Optional[str] = None,
     ) -> None:
-        load_dotenv()
+        try:
+            from dotenv import load_dotenv
+        except ModuleNotFoundError:
+            load_dotenv = None
+
+        if load_dotenv is not None:
+            load_dotenv()
 
         resolved_api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not resolved_api_key:
