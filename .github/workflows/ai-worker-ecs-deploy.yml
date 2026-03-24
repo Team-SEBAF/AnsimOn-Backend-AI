@@ -1,0 +1,61 @@
+name: AI Worker Deploy ECS Fargate
+
+on:
+  push:
+    branches: [dev]
+    paths-ignore:
+      - "README.md"
+      - "README.ko.md"
+      - "**.md"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      # push to dev → dev, workflow_dispatch(Use workflow from) main → prod
+      ENV: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get AWS account ID
+        id: aws
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "ecr_registry=${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com" >> $GITHUB_OUTPUT
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin ${{ steps.aws.outputs.ecr_registry }}
+
+      - name: Build, tag, push
+        env:
+          ECR_URI: ${{ steps.aws.outputs.ecr_registry }}/ansimon-ai-worker-${{ env.ENV }}
+        run: |
+          docker build --platform linux/amd64 -t ansimon-ai-worker:latest .
+          docker tag ansimon-ai-worker:latest ${ECR_URI}:latest
+          docker push ${ECR_URI}:latest
+
+      - name: Force new deployment
+        run: |
+          aws ecs update-service \
+            --cluster ansimon-ai-cluster-${{ env.ENV }} \
+            --service ansimon-ai-worker-task-${{ env.ENV }}-service \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
