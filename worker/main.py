@@ -38,7 +38,14 @@ def worker_loop():
             continue
 
         for msg in messages:
-            body = json.loads(msg["Body"])
+            try:
+                body = json.loads(msg["Body"])
+            except json.JSONDecodeError as e:
+                logger.error(
+                    "잘못된 JSON 메시지 수신, 삭제함. raw=%s error=%s", msg["Body"][:200], e
+                )
+                delete_message(msg["ReceiptHandle"])
+                continue
 
             db = SessionLocal()
 
