@@ -20,7 +20,6 @@ dependencies = [
     # SSE 의존성
     "fastapi (>=0.135.1,<0.136.0)",
     "uvicorn[standard] (>=0.41.0,<0.42.0)",
-    "mangum (>=0.21.0,<0.22.0)",
 ]
 
 [project.optional-dependencies]
