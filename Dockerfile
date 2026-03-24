@@ -3,33 +3,28 @@
 
 FROM python:3.11-slim-bookworm
 
-# 시스템 패키지: Tesseract OCR, Poppler (pdf2image), ffmpeg (Whisper), git (ai 클론용)
+# 시스템 패키지: Tesseract OCR, Poppler (pdf2image), ffmpeg (Whisper)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-kor \
     poppler-utils \
     ffmpeg \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Poetry 설치
-ENV POETRY_VERSION=1.8.3
+# Poetry 설치 (로컬과 동일한 2.x - dependency-groups 지원)
+ENV POETRY_VERSION=2.2.1
 RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
 
 # 의존성만 먼저 설치 (캐시 활용)
 COPY pyproject.toml poetry.lock ./
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction --no-ansi -E worker
+    && poetry install --without dev --no-interaction --no-ansi -E worker \
+    && rm -rf /root/.cache/pypoetry
 
-# AI 모듈 클론 (별도 레포)
-RUN git clone --depth 1 https://github.com/Team-SEBAF/AnsimOn-AI.git ai_temp \
-    && mkdir -p ai \
-    && mv ai_temp/src ai/ \
-    && rm -rf ai_temp
-
-# 프로젝트 코드 복사
+# 프로젝트 코드 복사 (./scripts/clone_ai.sh로 ai/ 준비 후 빌드)
+COPY ai/ ./ai/
 COPY shared/ ./shared/
 COPY worker/ ./worker/
 
