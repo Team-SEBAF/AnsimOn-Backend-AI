@@ -1147,21 +1147,6 @@ html5 = ["html5lib"]
 htmlsoup = ["BeautifulSoup4"]
 
 [[package]]
-name = "mangum"
-version = "0.21.0"
-description = "AWS Lambda support for ASGI applications"
-optional = false
-python-versions = ">=3.9"
-groups = ["main"]
-files = [
-    {file = "mangum-0.21.0-py3-none-any.whl", hash = "sha256:309e48f5c629542516c5106ecf079f4ec08809ed50df882238d98fe1392820c7"},
-    {file = "mangum-0.21.0.tar.gz", hash = "sha256:e31ed72d67f9958fa4379f65df77729906dec6dfa00afa6ed4e06c77833000de"},
-]
-
-[package.dependencies]
-typing-extensions = "*"
-
-[[package]]
 name = "markupsafe"
 version = "3.0.3"
 description = "Safely add untrusted strings to HTML/XML markup."
@@ -3320,4 +3305,4 @@ worker = ["Pillow", "openai", "openai-whisper", "pdf2image", "pdfplumber", "pyte
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.12"
-content-hash = "9b2a4ea11626d12b942b2235fde8c043fc0731d1eeec616b0146cabe8450b271"
+content-hash = "bfc36985dc7980e35cb1e92c3a709efbe8a7faedfdf76a47be9a3c5724e4470a"
