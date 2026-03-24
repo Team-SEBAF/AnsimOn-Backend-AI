@@ -20,7 +20,8 @@ RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
 # 의존성만 먼저 설치 (캐시 활용)
 COPY pyproject.toml poetry.lock ./
 RUN poetry config virtualenvs.create false \
-    && poetry install --without dev --no-interaction --no-ansi -E worker
+    && poetry install --without dev --no-interaction --no-ansi -E worker \
+    && rm -rf /root/.cache/pypoetry
 
 # 프로젝트 코드 복사 (./scripts/clone_ai.sh로 ai/ 준비 후 빌드)
 COPY ai/ ./ai/
