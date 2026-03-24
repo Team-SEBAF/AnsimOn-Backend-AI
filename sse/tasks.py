@@ -12,7 +12,7 @@ from shared.models import Task, TaskStatus
 
 router = APIRouter(prefix="/api/v1", tags=["SSE Progress Stream"])
 
-# 주기 송신 간격(초). 프록시 idle 끊김·장시간 동일 processed 구간 대응
+# processed is None 구간: task_preparing 을 이 간격(초)으로 반복. 첫 바이트는 스트림 직후 1회 즉시 송신.
 SSE_HEARTBEAT_INTERVAL_SEC = 10.0
 
 
@@ -30,11 +30,16 @@ def _sse_format(
 async def _timeline_task_progress_generator(task_id: UUID):
     poll_interval = 1
     last_processed: int | None = None
-    collecting_sent = False
-    # processed is None: 러너 대기 heartbeat 타이머(evidence_collecting 직후 기준)
-    last_pending_runner_emit_mono: float | None = None
     # processed 있음: 마지막 progress 송신 시각(실제 증가 또는 동일값 heartbeat)
     last_progress_emit_mono: float | None = None
+
+    last_task_preparing_emit_mono = time.monotonic()
+    yield _sse_format(
+        "task_preparing",
+        status=None,
+        processed=None,
+        total=None,
+    )
 
     while True:
         db: Session = SessionLocal()
@@ -55,18 +60,7 @@ async def _timeline_task_progress_generator(task_id: UUID):
             )
             total = task.total_evidence_count if task.total_evidence_count is not None else 0
 
-            if task.processed_evidence_count is None:
-                if not collecting_sent:
-                    collecting_sent = True
-                    yield _sse_format(
-                        "evidence_collecting",
-                        status=task.status.value,
-                        processed=None,
-                        total=None,
-                    )
-                    last_pending_runner_emit_mono = time.monotonic()
-
-            elif processed != last_processed:
+            if task.processed_evidence_count is not None and processed != last_processed:
                 last_processed = processed
                 yield _sse_format(
                     "progress",
@@ -91,15 +85,14 @@ async def _timeline_task_progress_generator(task_id: UUID):
         now = time.monotonic()
         if task is not None and task.status not in (TaskStatus.DONE, TaskStatus.FAILED):
             if task.processed_evidence_count is None:
-                ref = last_pending_runner_emit_mono
-                if ref is not None and now - ref >= SSE_HEARTBEAT_INTERVAL_SEC:
+                if now - last_task_preparing_emit_mono >= SSE_HEARTBEAT_INTERVAL_SEC:
                     yield _sse_format(
-                        "worker_waiting",
+                        "task_preparing",
                         status=task.status.value,
                         processed=None,
                         total=None,
                     )
-                    last_pending_runner_emit_mono = now
+                    last_task_preparing_emit_mono = now
             elif (
                 last_progress_emit_mono is not None
                 and now - last_progress_emit_mono >= SSE_HEARTBEAT_INTERVAL_SEC
@@ -118,7 +111,7 @@ async def _timeline_task_progress_generator(task_id: UUID):
 @router.get(
     "/timeline/{task_id}/progress",
     summary="타임라인 태스크 진행률 SSE",
-    description="processed/total 스트리밍.",
+    description="task_preparing(준비)·progress·done. payload는 status, processed, total 고정.",
 )
 async def timeline_task_progress_stream(task_id: UUID):
     db = SessionLocal()
