@@ -18,3 +18,4 @@ __pycache__/
 # ---- Local ----
 /data
 /logs
+/scripts/timeline_sse_stream.py

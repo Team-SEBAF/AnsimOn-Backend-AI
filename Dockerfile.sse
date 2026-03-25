@@ -1,0 +1,24 @@
+# SSE API (ECS Fargate 등).
+# 빌드: docker build --platform linux/amd64 -f Dockerfile.sse -t ansimon-sse:latest .
+
+FROM python:3.11-slim-bookworm
+
+WORKDIR /app
+
+ENV POETRY_VERSION=2.2.1
+RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
+
+COPY pyproject.toml poetry.lock ./
+RUN poetry config virtualenvs.create false \
+    && poetry install --without dev --no-interaction --no-ansi \
+    && rm -rf /root/.cache/pypoetry
+
+COPY shared/ ./shared/
+COPY sse/ ./sse/
+
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 8000
+
+CMD ["uvicorn", "sse.main:app", "--host", "0.0.0.0", "--port", "8000"]

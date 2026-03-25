@@ -39,10 +39,14 @@ poetry --version
 At the project root:
 
 ```bash
+# SSE only
 poetry install
+
+# Full (AI Worker + SSE)
+poetry install -E worker
 ```
 
-Poetry creates and manages the virtual environment and installs dependencies from `pyproject.toml`.
+Poetry creates and manages the virtual environment. The `worker` extra adds AI dependencies (openai, pytesseract, etc.).
 
 ---
 
@@ -50,11 +54,11 @@ Poetry creates and manages the virtual environment and installs dependencies fro
 
 ### Tech Stack
 
-| Category   | Technology    |
-| ---------- | ------------- |
-| Task Queue | AWS SQS       |
+| Category   | Technology      |
+| ---------- | --------------- |
+| Task Queue | AWS SQS         |
 | Deployment | AWS ECS Fargate |
-| ORM        | SQLAlchemy    |
+| ORM        | SQLAlchemy      |
 
 ### Clone AI Module
 
@@ -95,7 +99,7 @@ poetry run uvicorn sse.main:app --reload --port 8001
 ### Verify Streaming
 
 ```bash
-curl -N http://localhost:8001/timeline/{task_id}/progress
+curl -N http://localhost:8001/api/v1/timeline/{task_id}/progress
 ```
 
-Replace `{task_id}` with a valid task UUID. Events: `evidence_collecting`, `progress`, `done`.
+Replace `{task_id}` with a valid task UUID. Events: `task_preparing`, `progress`, `done`.
