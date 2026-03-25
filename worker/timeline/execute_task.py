@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from shared.models import Task
 from worker.timeline.ai_input_builder import build_ai_input
+from worker.timeline.save_output import save_output
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,17 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
         json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2),
     )
 
-    # 임시: result 그대로 저장. TODO: AI 성능 개선되면 스키마에 맞춰 변환 후 저장
+    timeline_id = save_output(
+        db,
+        complaint_id=complaint_id,
+        output=result,
+        ai_input=ai_input,
+    )
+    logger.info(
+        "timelines / timeline_evidences 저장 완료 (complaint_id: %s, timeline_id: %s)",
+        complaint_id,
+        timeline_id,
+    )
+
     task.result = result.model_dump(mode="json")
-    logger.info("타임라인 프로토타입 결과 저장 완료 (task_id: %s)", task.id)
+    logger.info("타임라인 프로토타입 결과(task.result) 저장 완료 (task_id: %s)", task.id)
