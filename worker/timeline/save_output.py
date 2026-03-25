@@ -12,6 +12,7 @@ from schemas.timeline_inputs import (
 )
 from sqlalchemy.orm import Session
 
+from shared.models.complaint_model import Complaint, ComplaintStep
 from shared.models.timeline_model import Timeline, TimelineEvidence
 
 # TimelineTagType (AI) → DB 문자열 (timelines JSON / API 계약)
@@ -91,6 +92,7 @@ def save_output(
     """
     timelines upsert(complaint_id 기준) + timeline_evidences 전면 교체.
     referenced_evidence_ids 길이만큼 row (각 referenced_evidence_id당 1행).
+    저장 후 complaint.step 을 TIMELINE 으로 설정한다.
     """
     timeline_json = build_timeline_json_for_db(output)
     type_format_by_evidence_id = _extract_type_and_file_format_by_evidence_id_from_input(ai_input)
@@ -134,4 +136,8 @@ def save_output(
             )
 
     db.flush()
+
+    complaint = db.get(Complaint, complaint_id)
+    complaint.step = ComplaintStep.TIMELINE
+
     return timeline_id

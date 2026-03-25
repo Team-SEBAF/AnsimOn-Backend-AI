@@ -15,7 +15,9 @@ class ComplaintStep(str, Enum):
     """고소장 작성 단계"""
 
     EVIDENCE = "EVIDENCE"
+    TIMELINE_GENERATING = "TIMELINE_GENERATING"
     TIMELINE = "TIMELINE"
+    DOCUMENT_GENERATING = "DOCUMENT_GENERATING"
     DOCUMENT = "DOCUMENT"
     COMPLETE = "COMPLETE"
 
@@ -33,7 +35,7 @@ class Complaint(Base):
     )
     name: Mapped[str] = mapped_column(String(50), nullable=False, default="고소장 제목")
     step: Mapped[ComplaintStep] = mapped_column(
-        SQLEnum(ComplaintStep, native_enum=False, length=20),
+        SQLEnum(ComplaintStep, native_enum=False, length=32),
         nullable=False,
         default=ComplaintStep.EVIDENCE,
     )
