@@ -54,11 +54,11 @@ Poetry가 가상환경을 만듭니다. `worker` extra는 AI 의존성(openai, p
 
 ### 기술 스택
 
-| 구분       | 기술              |
-| ---------- | ----------------- |
-| 태스크 큐  | AWS SQS           |
-| 배포       | AWS ECS Fargate   |
-| ORM        | SQLAlchemy        |
+| 구분      | 기술            |
+| --------- | --------------- |
+| 태스크 큐 | AWS SQS         |
+| 배포      | AWS ECS Fargate |
+| ORM       | SQLAlchemy      |
 
 ### AI 모듈 클론
 
@@ -99,7 +99,7 @@ poetry run uvicorn sse.main:app --reload --port 8001
 ### 스트리밍 확인
 
 ```bash
-curl -N http://localhost:8001/timeline/{task_id}/progress
+curl -N http://localhost:8001/api/v1/timeline/{task_id}/progress
 ```
 
-`{task_id}` 자리에 유효한 task UUID를 넣습니다. 이벤트: `evidence_collecting`, `progress`, `done`.
+`{task_id}` 자리에 유효한 task UUID를 넣습니다. 이벤트: `task_preparing`, `progress`, `done`.

@@ -1,0 +1,31 @@
+# AI Worker (ECS Fargate용)
+# 빌드: docker build --platform linux/amd64 -f Dockerfile.worker -t ansimon-ai-worker:latest .
+
+FROM python:3.11-slim-bookworm
+
+# 시스템 패키지: Tesseract OCR, Poppler (pdf2image), ffmpeg (Whisper)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-kor \
+    poppler-utils \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+ENV POETRY_VERSION=2.2.1
+RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
+
+COPY pyproject.toml poetry.lock ./
+RUN poetry config virtualenvs.create false \
+    && poetry install --without dev --no-interaction --no-ansi -E worker \
+    && rm -rf /root/.cache/pypoetry
+
+COPY ai/ ./ai/
+COPY shared/ ./shared/
+COPY worker/ ./worker/
+
+ENV PYTHONPATH=/app:/app/ai/src
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "-m", "worker.main"]
