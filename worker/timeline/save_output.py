@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import cast
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from schemas.timeline_inputs import (
     TimelineEvidenceItem,
@@ -90,31 +90,24 @@ def save_output(
     ai_input: TimelinePrototypeAiInput,
 ) -> UUID:
     """
-    timelines upsert(complaint_id 기준) + timeline_evidences 전면 교체.
-    referenced_evidence_ids 길이만큼 row (각 referenced_evidence_id당 1행).
+    complaint_id 당 timelines 행 1개: 기존이 있으면 삭제(DB CASCADE 로 timeline_evidences 정리) 후 새로 삽입.
+    referenced_evidence_ids 길이만큼 timeline_evidences row (각 referenced_evidence_id당 1행).
     저장 후 complaint.step 을 TIMELINE 으로 설정한다.
     """
     timeline_json = build_timeline_json_for_db(output)
     type_format_by_evidence_id = _extract_type_and_file_format_by_evidence_id_from_input(ai_input)
 
-    timeline = db.query(Timeline).filter(Timeline.complaint_id == complaint_id).one_or_none()
-    if timeline is None:
-        timeline = Timeline(
-            id=uuid4(),
-            complaint_id=complaint_id,
-            timeline_json=timeline_json,
-        )
-        db.add(timeline)
+    existing = db.query(Timeline).filter(Timeline.complaint_id == complaint_id).one_or_none()
+    if existing is not None:
+        db.delete(existing)
         db.flush()
-    else:
-        db.query(TimelineEvidence).filter(TimelineEvidence.timeline_id == timeline.id).delete(
-            synchronize_session=False
-        )
-        timeline.timeline_json = timeline_json
-        timeline.need_timeline_regeneration = False
-        timeline.need_evidence_collection_regeneration = True
-        timeline.need_timeline_pdf_regeneration = True
-        db.flush()
+
+    timeline = Timeline(
+        complaint_id=complaint_id,
+        timeline_json=timeline_json,
+    )
+    db.add(timeline)
+    db.flush()
 
     timeline_id = timeline.id
 
@@ -123,7 +116,6 @@ def save_output(
             etype, ffmt = type_format_by_evidence_id[ref_id]
             db.add(
                 TimelineEvidence(
-                    id=uuid4(),
                     timeline_id=timeline_id,
                     timeline_evidence_id=ev.timeline_evidence_id,
                     index=ev.index,
