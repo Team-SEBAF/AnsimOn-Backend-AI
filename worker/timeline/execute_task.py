@@ -5,6 +5,7 @@ from schemas.timeline_inputs import TimelinePrototypeOutput
 from sqlalchemy.orm import Session
 
 from shared.models import Task
+from worker.json_sanitize import strip_json_null_chars
 from worker.timeline.ai_input_builder import build_ai_input
 from worker.timeline.save_output import save_output
 
@@ -63,6 +64,7 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
         )
 
     dumped = output.model_dump(mode="json")
+    dumped = strip_json_null_chars(dumped)
     result = TimelinePrototypeOutput.model_validate(dumped)
     logger.info(
         "타임라인 프로토타입 완료 (complaint_id: %s): %s",

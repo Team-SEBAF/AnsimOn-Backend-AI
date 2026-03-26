@@ -103,3 +103,31 @@ curl -N http://localhost:8001/api/v1/timeline/{task_id}/progress
 ```
 
 Replace `{task_id}` with a valid task UUID. Events: `task_preparing`, `progress`, `done`.
+
+---
+
+## 4. CI/CD Workflows
+
+GitHub Actions workflows (AWS region `ap-northeast-2`, OIDC via `AWS_ROLE_ARN`):
+
+### On push to `dev`
+
+Markdown-only changes do not trigger deploys (`paths-ignore`: `README.md`, `README.ko.md`, `**.md`).
+
+**AI Worker Deploy ECS Fargate** (`ai-worker-ecs-deploy.yml`)
+
+- Builds `Dockerfile.worker` (`linux/amd64`), pushes to ECR `ansimon-ai-worker-dev:latest`
+- Calls `ecs update-service --force-new-deployment` on cluster `ansimon-ai-cluster-dev`, service `ansimon-ai-worker-task-dev-service`
+
+**SSE Deploy ECS Fargate** (`sse-ecs-deploy.yml`)
+
+- Builds `Dockerfile.sse`, pushes to ECR `ansimon-sse-dev:latest`
+- Force-new-deployment on `ansimon-ai-cluster-dev` / `ansimon-sse-task-dev-service`
+
+### Manual (`workflow_dispatch`)
+
+Same two workflows can be run manually from the Actions tab. **Target environment** follows the branch of the workflow definition you run: use **main** for **prod** images and ECS services (`ansimon-ai-worker-prod`, `ansimon-sse-prod`, clusters/services with `-prod-`), and **dev** for dev.
+
+### Database migrations
+
+Schema changes and Alembic migrations live in [AnsimOn-Backend](https://github.com/Team-SEBAF/AnsimOn-Backend); this repository does not run DB migrate workflows.

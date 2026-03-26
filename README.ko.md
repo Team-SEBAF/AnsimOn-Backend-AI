@@ -103,3 +103,31 @@ curl -N http://localhost:8001/api/v1/timeline/{task_id}/progress
 ```
 
 `{task_id}` 자리에 유효한 task UUID를 넣습니다. 이벤트: `task_preparing`, `progress`, `done`.
+
+---
+
+## 4. CI/CD 워크플로
+
+GitHub Actions 워크플로 (AWS 리전 `ap-northeast-2`, OIDC `AWS_ROLE_ARN`):
+
+### `dev` 브랜치에 push 할 때
+
+문서만 바뀐 커밋은 배포되지 않습니다 (`paths-ignore`: `README.md`, `README.ko.md`, `**.md`).
+
+**AI Worker Deploy ECS Fargate** (`ai-worker-ecs-deploy.yml`)
+
+- `Dockerfile.worker` 이미지 빌드 (`linux/amd64`) 후 ECR `ansimon-ai-worker-dev:latest` 푸시
+- 클러스터 `ansimon-ai-cluster-dev`, 서비스 `ansimon-ai-worker-task-dev-service`에 `ecs update-service --force-new-deployment`
+
+**SSE Deploy ECS Fargate** (`sse-ecs-deploy.yml`)
+
+- `Dockerfile.sse` 빌드 후 ECR `ansimon-sse-dev:latest` 푸시
+- `ansimon-ai-cluster-dev` / `ansimon-sse-task-dev-service` 강제 재배포
+
+### 수동 실행 (`workflow_dispatch`)
+
+Actions 탭에서 위 두 워크플로를 수동 실행할 수 있습니다. **배포 대상 환경**은 “Run workflow” 할 때 고른 **브랜치**에 맞춰집니다. 워크플로 정의를 **main**에서 실행하면 **prod** ECR·ECS(`ansimon-ai-worker-prod`, `ansimon-sse-prod` 및 `-prod-` 클러스터/서비스), **dev** 브랜치에서 실행하면 dev 쪽으로 배포됩니다.
+
+### DB 마이그레이션
+
+스키마·Alembic 마이그레이션은 [AnsimOn-Backend](https://github.com/Team-SEBAF/AnsimOn-Backend) 레포에서 다루며, 이 레포에는 DB migrate 워크플로가 없습니다.
