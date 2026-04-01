@@ -39,14 +39,10 @@ poetry --version
 프로젝트 루트에서:
 
 ```bash
-# SSE만
-poetry install
-
-# 전체 (AI Worker + SSE)
-poetry install -E worker
+poetry install -E sse -E worker
 ```
 
-Poetry가 가상환경을 만듭니다. `worker` extra는 AI 의존성(openai, pytesseract 등)을 추가합니다.
+Poetry가 가상환경을 만듭니다. 로컬 개발 시 **SSE**와 **AI Worker** extra를 한 번에 설치합니다.
 
 ---
 

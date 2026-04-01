@@ -17,12 +17,14 @@ dependencies = [
     "sqlalchemy (>=2.0.48,<3.0.0)",
     "psycopg2-binary (>=2.9.11,<3.0.0)",
     "boto3 (>=1.42.70,<2.0.0)",
-    # SSE 의존성
-    "fastapi (>=0.135.1,<0.136.0)",
-    "uvicorn[standard] (>=0.41.0,<0.42.0)",
 ]
 
 [project.optional-dependencies]
+# SSE API (FastAPI). poetry install -E sse
+sse = [
+    "fastapi (>=0.135.1,<0.136.0)",
+    "uvicorn[standard] (>=0.41.0,<0.42.0)",
+]
 # AI worker 전용 (/ai 포함). poetry install -E worker
 worker = [
     "openai>=1.0.0",
