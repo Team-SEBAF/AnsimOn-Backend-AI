@@ -20,6 +20,7 @@ from shared.models.evidences_model import (
     EvidenceVictim,
     EvidenceVoice,
 )
+from worker.heic_convert import heic_bytes_to_png
 
 # content_type → file_format 매핑 (type 무시, content_type만 사용)
 CONTENT_TYPE_TO_FORMAT: dict[
@@ -53,7 +54,7 @@ def _content_type_to_file_format(
 
 def _build_evidence_messages(
     db: Session, complaint_id
-) -> list[tuple[float, TimelinePrototypeEvidenceInput, str | None]]:
+) -> list[tuple[float, TimelinePrototypeEvidenceInput, str | None, str | None]]:
     """MESSAGE 타입 evidences."""
     rows = db.query(EvidenceMessage).filter(EvidenceMessage.complaint_id == complaint_id).all()
     result = []
@@ -73,6 +74,7 @@ def _build_evidence_messages(
                     file_created_at=r.file_created_at,
                 ),
                 r.s3_key,
+                r.content_type,
             )
         )
     return result
@@ -80,7 +82,7 @@ def _build_evidence_messages(
 
 def _build_evidence_voices(
     db: Session, complaint_id
-) -> list[tuple[float, TimelinePrototypeEvidenceInput, str | None]]:
+) -> list[tuple[float, TimelinePrototypeEvidenceInput, str | None, str | None]]:
     """VOICE 타입 evidences."""
     rows = db.query(EvidenceVoice).filter(EvidenceVoice.complaint_id == complaint_id).all()
     result = []
@@ -100,6 +102,7 @@ def _build_evidence_voices(
                     file_created_at=r.file_created_at,
                 ),
                 r.s3_key,
+                r.content_type,
             )
         )
     return result
@@ -107,7 +110,7 @@ def _build_evidence_voices(
 
 def _build_evidence_victims(
     db: Session, complaint_id
-) -> list[tuple[float, TimelinePrototypeEvidenceInput, str | None]]:
+) -> list[tuple[float, TimelinePrototypeEvidenceInput, str | None, str | None]]:
     """VICTIM 타입 evidences."""
     rows = db.query(EvidenceVictim).filter(EvidenceVictim.complaint_id == complaint_id).all()
     result = []
@@ -127,6 +130,7 @@ def _build_evidence_victims(
                     file_created_at=r.file_created_at,
                 ),
                 r.s3_key,
+                r.content_type,
             )
         )
     return result
@@ -134,7 +138,7 @@ def _build_evidence_victims(
 
 def _build_evidence_report_records(
     db: Session, complaint_id
-) -> list[tuple[float, TimelinePrototypeEvidenceInput, str | None]]:
+) -> list[tuple[float, TimelinePrototypeEvidenceInput, str | None, str | None]]:
     """REPORT_RECORD 타입 evidences."""
     rows = (
         db.query(EvidenceReportRecord)
@@ -158,6 +162,7 @@ def _build_evidence_report_records(
                     file_created_at=r.file_created_at,
                 ),
                 r.s3_key,
+                r.content_type,
             )
         )
     return result
@@ -165,7 +170,7 @@ def _build_evidence_report_records(
 
 def _build_evidence_incident_logs(
     db: Session, complaint_id
-) -> list[tuple[float, TimelinePrototypeEvidenceInput, str | None]]:
+) -> list[tuple[float, TimelinePrototypeEvidenceInput, str | None, str | None]]:
     """INCIDENT_LOG 타입 evidences. FILE / FORM_DATA 분기."""
     rows = (
         db.query(EvidenceIncidentLog).filter(EvidenceIncidentLog.complaint_id == complaint_id).all()
@@ -195,6 +200,7 @@ def _build_evidence_incident_logs(
                         file_created_at=file_row.file_created_at,
                     ),
                     file_row.s3_key,
+                    file_row.content_type,
                 )
             )
         else:  # FORM_DATA
@@ -223,6 +229,7 @@ def _build_evidence_incident_logs(
                         ),
                     ),
                     None,
+                    None,
                 )
             )
     return result
@@ -233,7 +240,7 @@ def build_ai_input(db: Session, complaint_id) -> TimelinePrototypeAiInput:
     complaint_id로 DB 조회 → TimelinePrototypeAiInput 생성.
     S3 다운로드는 병렬 처리 후 file_bytes 설정.
     """
-    all_evidences: list[tuple[float, TimelinePrototypeEvidenceInput, str | None]] = []
+    all_evidences: list[tuple[float, TimelinePrototypeEvidenceInput, str | None, str | None]] = []
     all_evidences.extend(_build_evidence_messages(db, complaint_id))
     all_evidences.extend(_build_evidence_voices(db, complaint_id))
     all_evidences.extend(_build_evidence_victims(db, complaint_id))
@@ -249,15 +256,22 @@ def build_ai_input(db: Session, complaint_id) -> TimelinePrototypeAiInput:
     else:
         evidences_to_use = all_evidences
 
-    evidences = [ev for _, ev, _ in evidences_to_use]
-    s3_keys = [s3 for _, _, s3 in evidences_to_use]
+    evidences = [ev for _, ev, _, _ in evidences_to_use]
+    s3_keys = [s3 for _, _, s3, _ in evidences_to_use]
+    source_content_types = [ct for _, _, _, ct in evidences_to_use]
 
     # S3 다운로드가 필요한 evidences (s3_key가 있는 것)
-    to_download = [(i, s3) for i, s3 in enumerate(s3_keys) if s3 is not None]
+    to_download = [
+        (i, s3_keys[i], source_content_types[i])
+        for i in range(len(evidences))
+        if s3_keys[i] is not None
+    ]
 
-    def _download_one(item: tuple[int, str]) -> tuple[int, bytes]:
-        i, s3_key = item
+    def _download_one(item: tuple[int, str, str | None]) -> tuple[int, bytes]:
+        i, s3_key, content_type = item
         data = download_s3_object(settings.S3_BUCKET_NAME, s3_key)
+        if content_type == "image/heic":
+            data = heic_bytes_to_png(data)
         return (i, data)
 
     with ThreadPoolExecutor(max_workers=10) as executor:
