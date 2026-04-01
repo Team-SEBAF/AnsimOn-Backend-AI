@@ -21,6 +21,9 @@ class Evidence:
     s3_key: Mapped[str] = mapped_column(String(512), nullable=False)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    file_created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, comment="원본 파일 생성 시각"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -116,6 +119,9 @@ class EvidenceIncidentLogFile(Base):
     s3_key: Mapped[str] = mapped_column(String(512), nullable=False)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    file_created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, comment="원본 파일 생성 시각"
+    )
 
 
 class EvidenceIncidentLogFormData(Base):

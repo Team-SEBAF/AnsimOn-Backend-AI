@@ -1,6 +1,4 @@
-import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
 from typing import Literal
 
 from schemas.timeline_inputs import (
@@ -30,7 +28,6 @@ CONTENT_TYPE_TO_FORMAT: dict[
     "image/jpeg": "IMAGE",
     "image/png": "IMAGE",
     "image/heic": "IMAGE",
-    "image/heif": "IMAGE",
     "audio/mp4": "AUDIO",
     "audio/x-m4a": "AUDIO",
     "audio/mpeg": "AUDIO",
@@ -46,14 +43,6 @@ CONTENT_TYPE_TO_FORMAT: dict[
     "application/vnd.hancom.hwp": "HWP",
     "text/plain": "TXT",
 }
-
-
-def _random_datetime_within_two_weeks() -> datetime:
-    """현재로부터 2주 사이의 랜덤 datetime (과거 2주)."""
-    now = datetime.utcnow()
-    delta = timedelta(days=14)
-    start = now - delta
-    return start + timedelta(seconds=random.randint(0, int(delta.total_seconds())))
 
 
 def _content_type_to_file_format(
@@ -81,7 +70,7 @@ def _build_evidence_messages(
                     file_format=fmt,
                     file_name=r.filename,
                     extracted_text=None,
-                    file_created_at=_random_datetime_within_two_weeks(),
+                    file_created_at=r.file_created_at,
                 ),
                 r.s3_key,
             )
@@ -108,7 +97,7 @@ def _build_evidence_voices(
                     file_format=fmt,
                     file_name=r.filename,
                     extracted_text=None,
-                    file_created_at=_random_datetime_within_two_weeks(),
+                    file_created_at=r.file_created_at,
                 ),
                 r.s3_key,
             )
@@ -135,7 +124,7 @@ def _build_evidence_victims(
                     file_format=fmt,
                     file_name=r.filename,
                     extracted_text=None,
-                    file_created_at=_random_datetime_within_two_weeks(),
+                    file_created_at=r.file_created_at,
                 ),
                 r.s3_key,
             )
@@ -166,7 +155,7 @@ def _build_evidence_report_records(
                     file_format=fmt,
                     file_name=r.filename,
                     extracted_text=None,
-                    file_created_at=_random_datetime_within_two_weeks(),
+                    file_created_at=r.file_created_at,
                 ),
                 r.s3_key,
             )
@@ -203,7 +192,7 @@ def _build_evidence_incident_logs(
                         file_format=fmt,
                         file_name=r.name,
                         extracted_text=None,
-                        file_created_at=_random_datetime_within_two_weeks(),
+                        file_created_at=file_row.file_created_at,
                     ),
                     file_row.s3_key,
                 )
