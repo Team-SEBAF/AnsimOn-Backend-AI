@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
+import json
 import shutil
 from collections.abc import Callable
-from datetime import datetime
 from functools import partial
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -11,9 +12,14 @@ from ansimon_ai.eval.validator_adapter_v0 import StructuringValidatorV0
 from ansimon_ai.structuring.anchor.matcher import AnchorMatcher
 from ansimon_ai.structuring.from_stt import build_structuring_input_from_stt
 from ansimon_ai.structuring.from_text import build_structuring_input_from_text
+from ansimon_ai.prompting.build_messages import (
+    build_victim_image_messages,
+    build_victim_video_messages,
+)
 from ansimon_ai.structuring.run import run_structuring_pipeline
 from ansimon_ai.structuring.timestamp_utils import extract_timestamp
 from ansimon_ai.structuring.types import StructuringInput
+from ansimon_ai.video import extract_frames_from_video
 
 from .grouping import bucket_evidences_by_date_time, build_timeline_event_evidences
 from .types import (
@@ -35,7 +41,6 @@ MISSING_DEPENDENCY_ERROR = "MISSING_DEPENDENCY"
 FILE_READ_ERROR = "FILE_READ_ERROR"
 STRUCTURING_ERROR = "STRUCTURING_ERROR"
 
-
 def build_timeline_prototype(
     ai_input: TimelinePrototypeAiInput,
     *,
@@ -47,6 +52,7 @@ def build_timeline_prototype(
     cache: Optional[object] = None,
     model_version: str = DEFAULT_MODEL_VERSION,
     progress_callback: Optional[Callable[[int, int], None]] = None,
+    victim_video_frame_interval_seconds: int = 3,
 ) -> TimelinePrototypeOutput:
     if anchor_matcher is None:
         anchor_matcher = AnchorMatcher()
@@ -61,6 +67,7 @@ def build_timeline_prototype(
         stt_engine=stt_engine,
         ocr_runner=ocr_runner,
         cache=cache,
+        victim_video_frame_interval_seconds=victim_video_frame_interval_seconds,
     )
     total = len(ai_input.evidences)
     evidence_results: List[EvidenceProcessingResult] = []
@@ -71,14 +78,13 @@ def build_timeline_prototype(
             evidence_results.append(result)
         if progress_callback is not None:
             progress_callback(i + 1, total)
-
+            
     items = _assemble_timeline_items(evidence_results)
     return TimelinePrototypeOutput(
         items=items,
         model_version=model_version,
         evidence_results=evidence_results,
     )
-
 
 def process_single_evidence(
     evidence: TimelinePrototypeEvidenceInput,
@@ -89,14 +95,13 @@ def process_single_evidence(
     stt_engine=None,
     ocr_runner=None,
     cache: Optional[object] = None,
+    victim_video_frame_interval_seconds: int = 3,
 ) -> EvidenceProcessingResult:
     if evidence.type == "VICTIM":
-        return EvidenceProcessingResult(
-            evidence_id=evidence.evidence_id,
-            type=evidence.type,
-            status="skipped",
-            error_code=UNSUPPORTED_TYPE_ERROR,
-            error_message="VICTIM evidence is not supported in prototype-1.",
+        return _process_victim_evidence(
+            evidence,
+            llm_client=llm_client,
+            frame_interval_seconds=victim_video_frame_interval_seconds,
         )
 
     if anchor_matcher is None:
@@ -196,7 +201,6 @@ def process_single_evidence(
             except OSError:
                 pass
 
-
 def _prepare_structuring_input(
     evidence: TimelinePrototypeEvidenceInput,
     *,
@@ -241,6 +245,82 @@ def _prepare_structuring_input(
 
     raise NotImplementedError(f"{evidence.type} is not supported in prototype-1.")
 
+def _process_victim_evidence(
+    evidence: TimelinePrototypeEvidenceInput,
+    *,
+    llm_client,
+    frame_interval_seconds: int = 10,
+) -> EvidenceProcessingResult:
+    if evidence.file_format not in {"IMAGE", "VIDEO"}:
+        return EvidenceProcessingResult(
+            evidence_id=evidence.evidence_id,
+            type=evidence.type,
+            status="skipped",
+            error_code=UNSUPPORTED_FORMAT_ERROR,
+            error_message="VICTIM supports IMAGE or VIDEO only at the moment.",
+        )
+
+    if evidence.file_bytes is None:
+        return EvidenceProcessingResult(
+            evidence_id=evidence.evidence_id,
+            type=evidence.type,
+            status="skipped",
+            error_code=MISSING_INPUT_ERROR,
+            error_message="file_bytes is required for VICTIM IMAGE evidence.",
+        )
+
+    temp_dir = _create_runtime_temp_dir(evidence)
+    try:
+        if evidence.file_format == "IMAGE":
+            messages = build_victim_image_messages(
+                image_bytes=evidence.file_bytes,
+                file_name=evidence.file_name,
+                file_format=evidence.file_format,
+            )
+        else:
+            input_path = _materialize_input_file(evidence, temp_dir=temp_dir)
+            frames_dir = temp_dir / "frames"
+            frames = extract_frames_from_video(
+                input_path,
+                output_dir=frames_dir,
+                interval_seconds=frame_interval_seconds,
+            )
+            messages = build_victim_video_messages(
+                frames=frames,
+                file_name=evidence.file_name,
+            )
+
+        structured_data = json.loads(llm_client.generate(messages))
+    except Exception as exc:
+        return EvidenceProcessingResult(
+            evidence_id=evidence.evidence_id,
+            type=evidence.type,
+            status="failed",
+            source_type="vision",
+            error_code=STRUCTURING_ERROR,
+            error_message=str(exc),
+        )
+    finally:
+        try:
+            shutil.rmtree(temp_dir)
+        except OSError:
+            pass
+
+    description = _build_description(evidence, "", structured_data)
+    normalized_text = description or (evidence.file_name or str(evidence.evidence_id))
+
+    return EvidenceProcessingResult(
+        evidence_id=evidence.evidence_id,
+        type=evidence.type,
+        status="completed",
+        source_type="vision",
+        normalized_text=normalized_text,
+        structured_data=structured_data,
+        timestamp=evidence.file_created_at,
+        title=_build_title(evidence, structured_data),
+        description=description,
+        tags=_build_tags(structured_data),
+    )
 
 def _prepare_structuring_input_from_extracted_text(
     evidence: TimelinePrototypeEvidenceInput,
@@ -266,7 +346,6 @@ def _prepare_structuring_input_from_extracted_text(
 
     return build_structuring_input_from_text(text), "document"
 
-
 def _prepare_message_from_file(
     evidence: TimelinePrototypeEvidenceInput,
     input_path: str,
@@ -280,7 +359,6 @@ def _prepare_message_from_file(
 
     ocr_result = _run_ocr(input_path, ocr_runner=ocr_runner)
     return build_structuring_input_from_ocr(ocr_result), "ocr"
-
 
 def _prepare_voice_from_file(
     evidence: TimelinePrototypeEvidenceInput,
@@ -301,7 +379,6 @@ def _prepare_voice_from_file(
 
     raise NotImplementedError("VOICE supports AUDIO or IMAGE only in prototype-1.")
 
-
 def _prepare_report_record_from_file(
     evidence: TimelinePrototypeEvidenceInput,
     input_path: str,
@@ -316,7 +393,6 @@ def _prepare_report_record_from_file(
         ),
     )
 
-
 def _prepare_incident_log_from_file(
     evidence: TimelinePrototypeEvidenceInput,
     input_path: str,
@@ -330,7 +406,6 @@ def _prepare_incident_log_from_file(
             "TXT, or DOCX only in prototype-1."
         ),
     )
-
 
 def _prepare_document_evidence_from_file(
     evidence: TimelinePrototypeEvidenceInput,
@@ -363,7 +438,6 @@ def _prepare_document_evidence_from_file(
 
     raise NotImplementedError(unsupported_default_message)
 
-
 def _build_document_structuring_input(text: str) -> StructuringInput:
     from ansimon_ai.pdf.document_structuring import build_structuring_input_from_document
 
@@ -371,7 +445,6 @@ def _build_document_structuring_input(text: str) -> StructuringInput:
     if not lines:
         lines = [text]
     return build_structuring_input_from_document(lines)
-
 
 def _run_ocr(image_path: str, *, ocr_runner=None):
     if ocr_runner is not None:
@@ -381,7 +454,6 @@ def _run_ocr(image_path: str, *, ocr_runner=None):
 
     return ocr_image_to_result(image_path)
 
-
 def _run_stt(audio_path: str, *, stt_engine=None):
     if stt_engine is not None:
         return stt_engine.transcribe(audio_path)
@@ -389,7 +461,6 @@ def _run_stt(audio_path: str, *, stt_engine=None):
     from ansimon_ai.stt.whisper_stt import WhisperSTT
 
     return WhisperSTT().transcribe(audio_path)
-
 
 def _materialize_input_file(evidence: TimelinePrototypeEvidenceInput, *, temp_dir: Path) -> str:
     if evidence.file_bytes is None:
@@ -400,14 +471,12 @@ def _materialize_input_file(evidence: TimelinePrototypeEvidenceInput, *, temp_di
     file_path.write_bytes(evidence.file_bytes)
     return str(file_path)
 
-
 def _resolve_temp_file_name(evidence: TimelinePrototypeEvidenceInput) -> str:
     if evidence.file_name:
         return Path(evidence.file_name).name
 
     suffix = _default_suffix_for_format(evidence.file_format)
     return f"{evidence.evidence_id}{suffix}"
-
 
 def _default_suffix_for_format(file_format: Optional[str]) -> str:
     mapping = {
@@ -421,14 +490,12 @@ def _default_suffix_for_format(file_format: Optional[str]) -> str:
     }
     return mapping.get(file_format or "", ".bin")
 
-
 def _create_runtime_temp_dir(evidence: TimelinePrototypeEvidenceInput) -> Path:
     temp_dir = Path("data") / "_timeline_runtime_tmp" / str(evidence.evidence_id)
     if temp_dir.exists():
         shutil.rmtree(temp_dir, ignore_errors=True)
     temp_dir.mkdir(parents=True, exist_ok=True)
     return temp_dir
-
 
 def _incident_log_to_text(evidence: TimelinePrototypeEvidenceInput) -> str:
     form = evidence.incident_log_form
@@ -442,7 +509,6 @@ def _incident_log_to_text(evidence: TimelinePrototypeEvidenceInput) -> str:
             f"상황: {form.situation}",
         ]
     )
-
 
 def _build_incident_log_form_timestamp(
     evidence: TimelinePrototypeEvidenceInput,
@@ -471,7 +537,6 @@ def _build_incident_log_form_timestamp(
 
     return None
 
-
 def _build_title(
     evidence: TimelinePrototypeEvidenceInput,
     structured_data: Optional[dict] = None,
@@ -491,7 +556,6 @@ def _build_title(
         "INCIDENT_LOG": "사건 일지",
     }
     return mapping.get(evidence.type, evidence.type)
-
 
 def _build_description(
     evidence: TimelinePrototypeEvidenceInput,
@@ -514,7 +578,6 @@ def _build_description(
         return text
     return f"{text[:limit].rstrip()}..."
 
-
 def _extract_timeline_summary(structured_data: Optional[dict]) -> dict:
     if not isinstance(structured_data, dict):
         return {}
@@ -528,7 +591,6 @@ def _extract_timeline_summary(structured_data: Optional[dict]) -> dict:
         return {}
 
     return value
-
 
 def _build_tags(structured_data: Optional[dict]) -> List[str]:
     if not isinstance(structured_data, dict):
@@ -549,7 +611,6 @@ def _build_tags(structured_data: Optional[dict]) -> List[str]:
             result.append(tag)
     return result
 
-
 def _extract_primary_timestamp(struct_input: StructuringInput):
     first_timestamp = None
     for segment in struct_input.segments:
@@ -566,7 +627,6 @@ def _extract_primary_timestamp(struct_input: StructuringInput):
         return full_text_timestamp
 
     return first_timestamp or full_text_timestamp
-
 
 def _assemble_timeline_items(
     evidence_results: List[EvidenceProcessingResult],
@@ -600,13 +660,11 @@ def _assemble_timeline_items(
 
     return [TimelineDateItem(date=date, events=events) for date, events in by_date.items()]
 
-
 def _sorted_bucket_keys(buckets):
     return sorted(
         buckets.keys(),
         key=lambda item: (_date_sort_key(item[0]), item[1]),
     )
-
 
 def _date_sort_key(date_str: str):
     if date_str == "UNKNOWN":

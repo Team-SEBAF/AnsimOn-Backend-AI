@@ -60,7 +60,7 @@ class EvidenceProcessingResult(BaseModel):
     evidence_id: UUID
     type: EvidenceType
     status: EvidenceProcessingStatus
-    source_type: Optional[Literal["ocr", "stt", "document", "form"]] = None
+    source_type: Optional[Literal["ocr", "stt", "document", "form", "vision"]] = None
     normalized_text: Optional[str] = None
     structured_data: Optional[Dict[str, Any]] = None
     timestamp: Optional[datetime] = None
