@@ -1,6 +1,9 @@
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
+
+from dotenv import load_dotenv
 
 from ansimon_ai.structuring.types import StructuringInput
 from ansimon_ai.structuring.cache.hash import compute_input_hash
@@ -8,6 +11,8 @@ from ansimon_ai.structuring.cache.storage import (
     load_structured_result,
     save_structured_result,
 )
+
+load_dotenv()
 
 def _default_storage_path(schema_version: str, input_hash: str) -> Path:
     return Path("data") / "structuring" / schema_version / f"{input_hash}.json"
@@ -26,10 +31,16 @@ def get_or_create_structured_result(
         prompt_version=prompt_version,
     )
 
-    path_fn = storage_path_fn or _default_storage_path
-    path = path_fn(schema_version, input_hash)
+    is_local = os.getenv("ENV") == "local"
 
-    cached = load_structured_result(path)
+    if is_local:
+        path_fn = storage_path_fn or _default_storage_path
+        path = path_fn(schema_version, input_hash)
+        cached = load_structured_result(path)
+    else:
+        from ansimon_ai.caching import load_cached_json
+        cached = load_cached_json(input_hash)
+
     if cached is not None:
         return cached
 
@@ -45,5 +56,10 @@ def get_or_create_structured_result(
         "result": result,
     }
 
-    save_structured_result(path, payload)
+    if is_local:
+        save_structured_result(path, payload)
+    else:
+        from ansimon_ai.caching import cache_json
+        cache_json(input_hash, payload)
+
     return payload

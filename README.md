@@ -39,14 +39,10 @@ poetry --version
 At the project root:
 
 ```bash
-# SSE only
-poetry install
-
-# Full (AI Worker + SSE)
-poetry install -E worker
+poetry install -E sse -E worker
 ```
 
-Poetry creates and manages the virtual environment. The `worker` extra adds AI dependencies (openai, pytesseract, etc.).
+Poetry creates and manages the virtual environment. This installs **SSE** (FastAPI) and **AI Worker** extras together for local development.
 
 ---
 

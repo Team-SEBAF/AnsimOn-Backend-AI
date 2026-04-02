@@ -14,21 +14,7 @@ from sqlalchemy.orm import Session
 
 from shared.models.complaint_model import Complaint, ComplaintStep
 from shared.models.timeline_model import Timeline, TimelineEvidence
-
-# TimelineTagType (AI) → DB 문자열 (timelines JSON / API 계약)
-_AI_TAG_TO_DB: dict[str, str] = {
-    "repeat": "REPEAT",
-    "physical": "PHYSICAL_HARM",
-    "threat": "THREAT_COERCION",
-    "sexual_insult": "SEXUAL_INSULT",
-    "refusal": "REFUSAL_INTENT",
-}
-
-
-def _map_timeline_tags(tags: list[str]) -> list[str]:
-    if not tags:
-        return []
-    return [_AI_TAG_TO_DB[t] for t in tags]
+from worker.tag_map import map_ai_tags_to_db
 
 
 def _file_format_to_db_file_type(file_format: str) -> str:
@@ -50,7 +36,7 @@ def _extract_type_and_file_format_by_evidence_id_from_input(
 def _transform_evidence_for_timeline_json(ev: TimelineEvidenceItem) -> dict:
     """items 안 evidences: 태그 매핑 + 썸네일 등 기본값."""
     d = ev.model_dump(mode="json")
-    d["tags"] = _map_timeline_tags(ev.tags)
+    d["tags"] = map_ai_tags_to_db(ev.tags)
     d["has_thumbnail"] = False
     d["thumbnail_url"] = ""
     d["duration_seconds"] = None
