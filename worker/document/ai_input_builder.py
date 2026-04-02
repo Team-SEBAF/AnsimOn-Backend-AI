@@ -12,7 +12,9 @@ from worker.tag_map import map_db_tags_to_ai
 
 logger = logging.getLogger(__name__)
 
-_EVIDENCE_DROP_KEYS = frozenset({"has_thumbnail", "thumbnail_url", "duration_seconds"})
+_EVIDENCE_DROP_KEYS = frozenset(
+    {"has_thumbnail", "thumbnail_url", "duration_seconds", "referenced_evidence_count"}
+)
 
 
 def _uuid_from_json(val: Any) -> UUID:
@@ -68,7 +70,7 @@ def _transform_evidence_for_document_input(
 def build_document_ai_input(db: Session, complaint_id: UUID) -> dict[str, Any]:
     """
     timelines.timeline_json 을 복사한 뒤 증거 단위 후처리.
-    - has_thumbnail / thumbnail_url / duration_seconds 제거
+    - has_thumbnail / thumbnail_url / duration_seconds / referenced_evidence_count 제거
     - tags: DB → AI 태그 역매핑
     - referenced_evidence_ids: is_ai_original=False 이면 []; True 이면 timeline_evidences 조회
     """
@@ -82,8 +84,10 @@ def build_document_ai_input(db: Session, complaint_id: UUID) -> dict[str, Any]:
     timeline_id = timeline.id
     for date_item in items:
         for event in date_item["events"]:
-            for ev in event["evidences"]:
-                ev = _transform_evidence_for_document_input(db, timeline_id=timeline_id, ev=ev)
+            for i, ev in enumerate(event["evidences"]):
+                event["evidences"][i] = _transform_evidence_for_document_input(
+                    db, timeline_id=timeline_id, ev=ev
+                )
 
     logger.info(
         "문서 AI 인풋 생성 완료 (complaint_id=%s, timeline_id=%s, items=%d)",

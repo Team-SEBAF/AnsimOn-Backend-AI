@@ -18,8 +18,8 @@ def execute_document_task(task: Task, db: Session, *, message_body: dict[str, An
     # 1. AI 입력 생성
     complaint_id = task.complaint_id
     ai_input = build_document_ai_input(db, complaint_id)  # noqa: F841 — 추후 ai_input 사용 시 ruff 주석 삭제
-    logger.info("AI 입력 생성 완료 (task_id: %s)", task.id)
-    # logger.info("AI 입력 생성 완료 (task_id: %s) ai_input=%s", task.id, ai_input)
+    # logger.info("AI 입력 생성 완료 (task_id: %s)", task.id)
+    logger.info("AI 입력 생성 완료 (task_id: %s) ai_input=%s", task.id, ai_input)
 
     # 2. 도큐먼트 AI 실행
     logger.info("도큐먼트 AI 실행 시작 (task_id: %s)", task.id)
