@@ -34,7 +34,7 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
     else:
         llm_client = MockLLMClient()
 
-    # 3. 타임라인 프로토타입 실행
+    # 3. 타임라인 AI 실행
     total = len(ai_input.evidences)
     task.total_evidence_count = total
     task.processed_evidence_count = 0
@@ -45,7 +45,7 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
         db.commit()
         logger.info("증거 처리 진행 (task_id: %s): (%d/%d)", task.id, processed, total_count)
 
-    logger.info("타임라인 프로토타입 실행 시작 (task_id: %s) (llm_type: %s)", task.id, llm_type)
+    logger.info("타임라인 AI 실행 시작 (task_id: %s) (llm_type: %s)", task.id, llm_type)
     output = build_timeline_prototype(
         ai_input,
         llm_client=llm_client,
@@ -67,7 +67,7 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
     dumped = strip_json_null_chars(dumped)
     result = TimelinePrototypeOutput.model_validate(dumped)
     logger.info(
-        "타임라인 프로토타입 완료 (complaint_id: %s): %s",
+        "타임라인 AI 완료 (complaint_id: %s): %s",
         complaint_id,
         json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2),
     )
@@ -85,4 +85,4 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
     )
 
     task.result = result.model_dump(mode="json")
-    logger.info("타임라인 프로토타입 결과(task.result) 저장 완료 (task_id: %s)", task.id)
+    logger.info("타임라인 AI 결과(task.result) 저장 완료 (task_id: %s)", task.id)
