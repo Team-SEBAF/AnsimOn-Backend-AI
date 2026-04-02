@@ -21,6 +21,7 @@ _h.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(messa
 _root.addHandler(_h)
 
 from shared.core.database import SessionLocal  # noqa: E402
+from worker.document.execute_task import execute_document_task  # noqa: E402
 from worker.sqs_utils import delete_message, process_message, receive_messages  # noqa: E402
 from worker.timeline.execute_task import execute_timeline_task  # noqa: E402
 
@@ -55,11 +56,7 @@ def worker_loop():
                     execute_task = partial(execute_timeline_task, llm_type=llm_type)
 
                 elif body.get("type") == "document":
-
-                    def _execute_document(task, db):
-                        raise NotImplementedError("document 타입은 아직 미구현")
-
-                    execute_task = _execute_document
+                    execute_task = execute_document_task
                 else:
 
                     def _unknown(task, db):
