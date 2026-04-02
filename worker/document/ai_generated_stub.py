@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from pydantic import BaseModel
 
 
-@dataclass(frozen=True)
-class DocumentAiGeneratedFields:
+class DocumentAiGeneratedFields(BaseModel):
     """AI가 채우는 부분만(고소장 3·4·5·6 본문·목록, 진술서 피해 사실)."""
 
     section_3_complaint_purpose_content: str

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import logging
 from datetime import date
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from shared.models.complaint_model import Complaint, ComplaintStep
 from shared.models.document_model import (
     ComplaintFormData,
+    ComplaintFormSection1Complainant,
     ComplaintFormSection3ComplaintPurpose,
     ComplaintFormSection4CrimeFacts,
     ComplaintFormSection5ComplaintReason,
@@ -19,29 +20,48 @@ from shared.models.document_model import (
 )
 from worker.document.ai_generated_stub import DocumentAiGeneratedFields
 
-logger = logging.getLogger(__name__)
+
+def _format_birthdate(user_birthdate: Any) -> str | None:
+    """
+    'YYYY-MM-DD' str 또는 null → 주민란 앞자리 'YYMMDD-'. 예: 2000-01-01 → 000101-
+    """
+    if user_birthdate is None:
+        return None
+    s = str(user_birthdate).strip()
+    if not s:
+        return None
+    try:
+        d = date.fromisoformat(s[:10])
+    except ValueError:
+        return None
+    return f"{d.year % 100:02d}{d.month:02d}{d.day:02d}-"
 
 
 def _build_complaint_form_data(
     output: DocumentAiGeneratedFields,
     *,
     today: date,
+    user_name: str,
+    user_email: str,
+    formatted_birthdate: str | None,
 ) -> ComplaintFormData:
     """
-    AI 출력(3~6) + 제출일 등 백엔드 자동값 + 나머지 None/기본.
+    AI 출력(3~6) + 1. 고소인(이름·이메일·주민앞자리) + 하단 고소인/제출인 성명 + 제출일.
     """
-    # 전달하지 않은 필드는, 키는 있고 값은 None 으로 채워짐
     return ComplaintFormData(
+        section_1_complainant=ComplaintFormSection1Complainant(
+            name_or_company=user_name,
+            email=user_email,
+            resident_or_corp_registration_number=formatted_birthdate,
+        ),
         section_3_complaint_purpose=ComplaintFormSection3ComplaintPurpose(
             content=output.section_3_complaint_purpose_content,
         ),
         section_4_crime_facts=ComplaintFormSection4CrimeFacts(
             content=output.section_4_crime_facts_content,
-            closing_summary=output.section_4_crime_facts_closing_summary,
         ),
         section_5_complaint_reason=ComplaintFormSection5ComplaintReason(
             content=output.section_5_complaint_reason_content,
-            closing_summary=output.section_5_complaint_reason_closing_summary,
         ),
         section_6_evidence=ComplaintFormSection6Evidence(
             has_evidence_beyond_statement=True,
@@ -51,9 +71,8 @@ def _build_complaint_form_data(
             date_year=today.year,
             date_month=today.month,
             date_day=today.day,
-            # TODO: Cognito 연동 후
-            accuser_name=None,
-            submitter_name=None,
+            accuser_name=user_name,
+            submitter_name=user_name,
             submission_target_police_station=None,
         ),
     )
@@ -63,14 +82,14 @@ def _build_statement_form_data(
     output: DocumentAiGeneratedFields,
     *,
     today: date,
+    user_name: str,
 ) -> StatementFormData:
     return StatementFormData(
         damage_facts_statement=output.statement_damage_facts_statement,
         date_year=today.year,
         date_month=today.month,
         date_day=today.day,
-        # TODO: Cognito 연동 후
-        declarant_name=None,
+        declarant_name=user_name,
         submission_target_police_station=None,
     )
 
@@ -80,14 +99,25 @@ def save_output(
     *,
     complaint_id: UUID,
     output: DocumentAiGeneratedFields,
+    message_body: dict[str, Any],
 ) -> UUID:
     """
     complaint_id 당 documents 행 1개: 기존이 있으면 삭제 후 삽입.
     저장 후 complaint.step = DOCUMENT.
     """
+    user_name = str(message_body["user_name"]).strip()
+    user_email = str(message_body["user_email"]).strip()
+    formatted_birthdate = _format_birthdate(message_body["user_birthdate"])
+
     today = date.today()
-    complaint_form = _build_complaint_form_data(output, today=today)
-    statement_form = _build_statement_form_data(output, today=today)
+    complaint_form = _build_complaint_form_data(
+        output,
+        today=today,
+        user_name=user_name,
+        user_email=user_email,
+        formatted_birthdate=formatted_birthdate,
+    )
+    statement_form = _build_statement_form_data(output, today=today, user_name=user_name)
 
     complaint_payload = complaint_form.model_dump(mode="json")
     statement_payload = statement_form.model_dump(mode="json")

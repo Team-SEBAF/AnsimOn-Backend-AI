@@ -56,7 +56,7 @@ def worker_loop():
                     execute_task = partial(execute_timeline_task, llm_type=llm_type)
 
                 elif body.get("type") == "document":
-                    execute_task = execute_document_task
+                    execute_task = partial(execute_document_task, message_body=body)
                 else:
 
                     def _unknown(task, db):
