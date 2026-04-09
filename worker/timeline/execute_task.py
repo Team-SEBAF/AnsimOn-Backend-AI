@@ -4,6 +4,7 @@ import logging
 from schemas.timeline_inputs import TimelinePrototypeOutput
 from sqlalchemy.orm import Session
 
+from shared.core.database import SessionLocal
 from shared.models import Task
 from worker.json_sanitize import strip_json_null_chars
 from worker.timeline.ai_input_builder import build_ai_input
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") -> None:
+    task_id = task.id
     # 1. AI 입력 생성
     complaint_id = task.complaint_id
     ai_input = build_ai_input(db, complaint_id)
@@ -41,9 +43,13 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
     db.commit()
 
     def _on_progress(processed: int, total_count: int) -> None:
-        task.processed_evidence_count = processed
-        db.commit()
-        logger.info("증거 처리 진행 (task_id: %s): (%d/%d)", task.id, processed, total_count)
+        # LLM 대기 중에는 바깥 db 세션 연결이 오래 유휴 → RDS 등이 끊을 수 있음. 진행률만 짧은 세션으로 갱신.
+        with SessionLocal() as progress_db:
+            row = progress_db.get(Task, task_id)
+            if row is not None:
+                row.processed_evidence_count = processed
+                progress_db.commit()
+        logger.info("증거 처리 진행 (task_id: %s): (%d/%d)", task_id, processed, total_count)
 
     logger.info("타임라인 AI 실행 시작 (task_id: %s) (llm_type: %s)", task.id, llm_type)
     output = build_timeline_prototype(
@@ -51,6 +57,14 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
         llm_client=llm_client,
         progress_callback=_on_progress,
     )
+
+    # 긴 LLM 동안 유휴였던 바깥 세션 연결은 끊겼을 수 있음 → 풀에서 새 연결을 쓰도록 정리 후 task 재조회
+    db.rollback()
+    db.connection().invalidate()
+    db.expire_all()
+    task = db.get(Task, task_id)
+    if task is None:
+        raise RuntimeError(f"태스크를 찾을 수 없습니다 (task_id: {task_id})")
 
     # 4. 증거 결과 로깅
     for r in output.evidence_results:
