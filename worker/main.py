@@ -51,12 +51,15 @@ def worker_loop():
             db = SessionLocal()
 
             try:
+                llm_type = body.get("llm_type", "mock")
+
                 if body.get("type") == "timeline":
-                    llm_type = body.get("llm_type", "mock")
                     execute_task = partial(execute_timeline_task, llm_type=llm_type)
 
                 elif body.get("type") == "document":
-                    execute_task = partial(execute_document_task, message_body=body)
+                    execute_task = partial(
+                        execute_document_task, message_body=body, llm_type=llm_type
+                    )
                 else:
 
                     def _unknown(task, db):
