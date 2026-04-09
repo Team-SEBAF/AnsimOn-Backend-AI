@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import hashlib
 import json
 import shutil
 from collections.abc import Callable
@@ -19,7 +20,7 @@ from ansimon_ai.prompting.build_messages import (
 from ansimon_ai.structuring.run import run_structuring_pipeline
 from ansimon_ai.structuring.timestamp_utils import extract_timestamp
 from ansimon_ai.structuring.types import StructuringInput
-from ansimon_ai.video import extract_frames_from_video
+from ansimon_ai.video import extract_frames_from_video, get_video_duration_seconds
 
 from .grouping import bucket_evidences_by_date_time, build_timeline_event_evidences
 from .types import (
@@ -101,6 +102,7 @@ def process_single_evidence(
         return _process_victim_evidence(
             evidence,
             llm_client=llm_client,
+            cache=cache,
             frame_interval_seconds=victim_video_frame_interval_seconds,
         )
 
@@ -249,7 +251,8 @@ def _process_victim_evidence(
     evidence: TimelinePrototypeEvidenceInput,
     *,
     llm_client,
-    frame_interval_seconds: int = 10,
+    cache: Optional[object] = None,
+    frame_interval_seconds: int = 3,
 ) -> EvidenceProcessingResult:
     if evidence.file_format not in {"IMAGE", "VIDEO"}:
         return EvidenceProcessingResult(
@@ -271,26 +274,45 @@ def _process_victim_evidence(
 
     temp_dir = _create_runtime_temp_dir(evidence)
     try:
-        if evidence.file_format == "IMAGE":
+        cache_key = _compute_victim_cache_key(
+            evidence,
+            default_frame_interval_seconds=frame_interval_seconds,
+        )
+        cached_structured_data = cache.get(cache_key) if cache is not None else None
+
+        if cached_structured_data is not None:
+            structured_data = cached_structured_data
+        elif evidence.file_format == "IMAGE":
             messages = build_victim_image_messages(
                 image_bytes=evidence.file_bytes,
                 file_name=evidence.file_name,
                 file_format=evidence.file_format,
             )
+            structured_data = json.loads(llm_client.generate(messages))
+            if cache is not None:
+                cache.set(cache_key, structured_data)
         else:
             input_path = _materialize_input_file(evidence, temp_dir=temp_dir)
             frames_dir = temp_dir / "frames"
+            resolved_frame_interval_seconds = _resolve_victim_video_frame_interval_seconds(
+                input_path,
+                default_interval_seconds=frame_interval_seconds,
+            )
+            messages = None
+            if cache_key is None:
+                raise ValueError("cache_key must be available for VICTIM VIDEO.")
             frames = extract_frames_from_video(
                 input_path,
                 output_dir=frames_dir,
-                interval_seconds=frame_interval_seconds,
+                interval_seconds=resolved_frame_interval_seconds,
             )
             messages = build_victim_video_messages(
                 frames=frames,
                 file_name=evidence.file_name,
             )
-
-        structured_data = json.loads(llm_client.generate(messages))
+            structured_data = json.loads(llm_client.generate(messages))
+            if cache is not None:
+                cache.set(cache_key, structured_data)
     except Exception as exc:
         return EvidenceProcessingResult(
             evidence_id=evidence.evidence_id,
@@ -445,6 +467,39 @@ def _build_document_structuring_input(text: str) -> StructuringInput:
     if not lines:
         lines = [text]
     return build_structuring_input_from_document(lines)
+
+def _resolve_victim_video_frame_interval_seconds(
+    input_path: str,
+    *,
+    default_interval_seconds: int,
+) -> int:
+    try:
+        duration_seconds = get_video_duration_seconds(input_path)
+    except Exception:
+        return default_interval_seconds
+
+    if duration_seconds <= 20:
+        return 1
+    return default_interval_seconds
+
+def _compute_victim_cache_key(
+    evidence: TimelinePrototypeEvidenceInput,
+    *,
+    default_frame_interval_seconds: int,
+) -> str:
+    if evidence.file_bytes is None or evidence.file_format not in {"IMAGE", "VIDEO"}:
+        raise ValueError("VICTIM cache key requires IMAGE/VIDEO evidence with file_bytes.")
+
+    file_hash = hashlib.sha256(evidence.file_bytes).hexdigest()
+    payload = {
+        "type": evidence.type,
+        "file_format": evidence.file_format,
+        "file_hash": file_hash,
+        "frame_interval_seconds": default_frame_interval_seconds,
+        "prompt_version": "victim_prompt_v0",
+    }
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    return f"victim::{hashlib.sha256(serialized.encode('utf-8')).hexdigest()}"
 
 def _run_ocr(image_path: str, *, ocr_runner=None):
     if ocr_runner is not None:

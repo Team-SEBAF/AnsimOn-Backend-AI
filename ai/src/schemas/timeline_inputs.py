@@ -76,6 +76,7 @@ class TimelineEvidenceItem(BaseModel):
     title: str
     description: str
     tags: List[TimelineTagType]
+    is_ai_original: bool = True
     referenced_evidence_count: int
     referenced_evidence_ids: List[UUID] = Field(default_factory=list)
 

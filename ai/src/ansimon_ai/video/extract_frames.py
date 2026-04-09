@@ -3,12 +3,42 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import subprocess
+import json
 
 @dataclass(frozen=True)
 class ExtractedVideoFrame:
     path: Path
     frame_index: int
     frame_timestamp_seconds: int
+
+def get_video_duration_seconds(
+    video_path: str | Path,
+    *,
+    ffprobe_binary: str = "ffprobe",
+) -> float:
+    input_path = Path(video_path)
+    result = subprocess.run(
+        [
+            ffprobe_binary,
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "json",
+            str(input_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout or "{}")
+    duration = payload.get("format", {}).get("duration")
+    if duration is None:
+        raise ValueError("Could not determine video duration.")
+
+    return float(duration)
 
 def extract_frames_from_video(
     video_path: str | Path,
