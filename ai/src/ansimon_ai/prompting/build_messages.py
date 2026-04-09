@@ -2,13 +2,26 @@ import base64
 import json
 from pathlib import Path
 
+from schemas.complaint_writing import ComplaintWritingAiInput
 from ansimon_ai.structuring.types import StructuringInput
 from ansimon_ai.video import ExtractedVideoFrame
 
 PROMPT_PATH = Path(__file__).parent / "system_prompt_v0.txt"
+COMPLAINT_DOCUMENT_PROMPT_PATH = (
+    Path(__file__).parent / "complaint_document_system_prompt_v0.txt"
+)
+DAMAGE_FACTS_STATEMENT_PROMPT_PATH = (
+    Path(__file__).parent / "damage_facts_statement_system_prompt_v0.txt"
+)
 
 def load_system_prompt() -> str:
     return PROMPT_PATH.read_text(encoding="utf-8")
+
+def load_complaint_document_system_prompt() -> str:
+    return COMPLAINT_DOCUMENT_PROMPT_PATH.read_text(encoding="utf-8")
+
+def load_damage_facts_statement_system_prompt() -> str:
+    return DAMAGE_FACTS_STATEMENT_PROMPT_PATH.read_text(encoding="utf-8")
 
 def build_structuring_messages(struct_input: StructuringInput) -> list[dict]:
     segments_json = json.dumps(
@@ -29,6 +42,46 @@ def build_structuring_messages(struct_input: StructuringInput) -> list[dict]:
                 f"{struct_input.full_text}\n\n"
                 "### SEGMENTS (json)\n\n"
                 f"{segments_json}"
+            ),
+        },
+    ]
+
+def build_complaint_document_messages(
+    ai_input: ComplaintWritingAiInput,
+) -> list[dict]:
+    ai_input_json = json.dumps(ai_input.model_dump(mode="json"), ensure_ascii=False, indent=2)
+
+    return [
+        {
+            "role": "system",
+            "content": load_complaint_document_system_prompt(),
+        },
+        {
+            "role": "user",
+            "content": (
+                "### STEP3 INPUT (json)\n\n"
+                f"{ai_input_json}\n\n"
+                "Write the complaint document sections strictly from the provided input."
+            ),
+        },
+    ]
+
+def build_damage_facts_statement_messages(
+    ai_input: ComplaintWritingAiInput,
+) -> list[dict]:
+    ai_input_json = json.dumps(ai_input.model_dump(mode="json"), ensure_ascii=False, indent=2)
+
+    return [
+        {
+            "role": "system",
+            "content": load_damage_facts_statement_system_prompt(),
+        },
+        {
+            "role": "user",
+            "content": (
+                "### STEP3 INPUT (json)\n\n"
+                f"{ai_input_json}\n\n"
+                "Write the damage facts statement strictly from the provided input."
             ),
         },
     ]

@@ -4,13 +4,13 @@ from datetime import date
 from typing import Any
 from uuid import UUID
 
+from schemas.complaint_writing import ComplaintDocumentOutput, DamageFactsStatementOutput
 from sqlalchemy.orm import Session
 
 from shared.models.complaint_model import Complaint, ComplaintStep
 from shared.models.document_model import (
     ComplaintFormData,
     ComplaintFormSection1Complainant,
-    ComplaintFormSection3ComplaintPurpose,
     ComplaintFormSection4CrimeFacts,
     ComplaintFormSection5ComplaintReason,
     ComplaintFormSection6Evidence,
@@ -18,7 +18,6 @@ from shared.models.document_model import (
     Document,
     StatementFormData,
 )
-from worker.document.ai_generated_stub import DocumentAiGeneratedFields
 
 
 def _format_birthdate(user_birthdate: Any) -> str | None:
@@ -38,7 +37,7 @@ def _format_birthdate(user_birthdate: Any) -> str | None:
 
 
 def _build_complaint_form_data(
-    output: DocumentAiGeneratedFields,
+    complaint_output: ComplaintDocumentOutput,
     *,
     today: date,
     user_name: str,
@@ -54,18 +53,15 @@ def _build_complaint_form_data(
             email=user_email,
             resident_or_corp_registration_number=formatted_birthdate,
         ),
-        section_3_complaint_purpose=ComplaintFormSection3ComplaintPurpose(
-            content=output.section_3_complaint_purpose_content,
-        ),
         section_4_crime_facts=ComplaintFormSection4CrimeFacts(
-            content=output.section_4_crime_facts_content,
+            content=complaint_output.section_4_crime_facts,
         ),
         section_5_complaint_reason=ComplaintFormSection5ComplaintReason(
-            content=output.section_5_complaint_reason_content,
+            content=complaint_output.section_5_complaint_reason,
         ),
         section_6_evidence=ComplaintFormSection6Evidence(
             has_evidence_beyond_statement=True,
-            evidence_list_text=list(output.section_6_evidence_list_text),
+            evidence_list_text=list(complaint_output.section_6_evidence_list_text),
         ),
         submission_footer=ComplaintFormSubmissionFooter(
             date_year=today.year,
@@ -79,13 +75,13 @@ def _build_complaint_form_data(
 
 
 def _build_statement_form_data(
-    output: DocumentAiGeneratedFields,
+    statement_output: DamageFactsStatementOutput,
     *,
     today: date,
     user_name: str,
 ) -> StatementFormData:
     return StatementFormData(
-        damage_facts_statement=output.statement_damage_facts_statement,
+        damage_facts_statement=statement_output.damage_facts_statement,
         date_year=today.year,
         date_month=today.month,
         date_day=today.day,
@@ -98,26 +94,30 @@ def save_output(
     db: Session,
     *,
     complaint_id: UUID,
-    output: DocumentAiGeneratedFields,
+    output: dict[str, Any],
     message_body: dict[str, Any],
 ) -> UUID:
     """
     complaint_id 당 documents 행 1개: 기존이 있으면 삭제 후 삽입.
     저장 후 complaint.step = DOCUMENT.
+    output: ComplaintDocumentOutput·DamageFactsStatementOutput 필드를 합친 dict (JSON 직렬화 호환 값).
     """
+    complaint_output = ComplaintDocumentOutput.model_validate(output)
+    statement_output = DamageFactsStatementOutput.model_validate(output)
+
     user_name = str(message_body["user_name"]).strip()
     user_email = str(message_body["user_email"]).strip()
     formatted_birthdate = _format_birthdate(message_body["user_birthdate"])
 
     today = date.today()
     complaint_form = _build_complaint_form_data(
-        output,
+        complaint_output,
         today=today,
         user_name=user_name,
         user_email=user_email,
         formatted_birthdate=formatted_birthdate,
     )
-    statement_form = _build_statement_form_data(output, today=today, user_name=user_name)
+    statement_form = _build_statement_form_data(statement_output, today=today, user_name=user_name)
 
     complaint_payload = complaint_form.model_dump(mode="json")
     statement_payload = statement_form.model_dump(mode="json")

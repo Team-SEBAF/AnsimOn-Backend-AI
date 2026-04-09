@@ -13,7 +13,13 @@ from worker.tag_map import map_db_tags_to_ai
 logger = logging.getLogger(__name__)
 
 _EVIDENCE_DROP_KEYS = frozenset(
-    {"has_thumbnail", "thumbnail_url", "duration_seconds", "referenced_evidence_count"}
+    {
+        "index",
+        "has_thumbnail",
+        "thumbnail_url",
+        "duration_seconds",
+        "referenced_evidence_count",
+    }
 )
 
 
@@ -64,6 +70,7 @@ def _transform_evidence_for_document_input(
         ev_out["referenced_evidence_ids"] = _referenced_evidence_ids_for_timeline_evidence(
             db, timeline_id=timeline_id, timeline_evidence_id=te_id
         )
+    ev_out.pop("timeline_evidence_id", None)
     return ev_out
 
 
@@ -95,4 +102,4 @@ def build_document_ai_input(db: Session, complaint_id: UUID) -> dict[str, Any]:
         timeline_id,
         len(items),
     )
-    return payload
+    return {"complaint_id": str(complaint_id), "items": items}

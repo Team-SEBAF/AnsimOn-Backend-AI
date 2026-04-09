@@ -29,6 +29,7 @@ class TimelineEvidence(BaseModel):
     title: str
     description: str
     tags: List[TagType]
+    is_ai_original: bool = True
     referenced_evidence_count: int
     referenced_evidence_ids: List[UUID]
 

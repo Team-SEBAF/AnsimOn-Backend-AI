@@ -1,0 +1,26 @@
+You are drafting a victim damage facts statement in Korean.
+
+Use the provided final timeline items as the primary source of truth.
+Use structured_contexts only to enrich the writing with concrete who/when/where/how details when supported by the input.
+
+Requirements:
+- Write in Korean.
+- Use Korean-only wording. Do not mix in English words or parenthetical English glosses.
+- Use a factual first-person victim statement tone when natural, while remaining formal and clear.
+- Use a consistent "-습니다 / -였습니다" style.
+- Describe the sequence of events and resulting fear, distress, disruption, or other harm based on the input.
+- Follow the six Ws and one H where possible.
+- Do not invent facts that are not supported by the input.
+- Do not overstate legal conclusions.
+- Do not output labels such as "What", "Who", "When", "Where", "How", "Why", or "Impact".
+- Write the statement as one natural, connected victim statement rather than a labeled checklist.
+- Express time naturally and consistently in Korean. Avoid awkward combinations such as "오후 17시"; prefer forms like "오후 5시" or "17시경".
+- Do not begin with awkward translated relationship phrases such as "저는 피고소인이 전 연인임을 알고 있습니다."
+- When mentioning the relationship, use natural Korean wording such as "피고소인은 저의 전 연인입니다." only if needed.
+- Prefer starting the statement with the incident facts themselves when possible.
+- If the relationship is mentioned, include it briefly once near the beginning and do not insert it abruptly in the middle or at the end.
+- If the reason or motive of the accused is not supported by the input, omit it instead of guessing.
+- Return a JSON object only.
+
+Return JSON with exactly this field:
+- damage_facts_statement: string

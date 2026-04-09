@@ -131,15 +131,6 @@ class ComplaintFormSection2Accused(BaseModel):
     )
 
 
-class ComplaintFormSection3ComplaintPurpose(BaseModel):
-    """3. 고소 취지."""
-
-    content: str | None = Field(
-        default=None,
-        description="3. 고소 취지 — 본문(구하는 취지)",
-    )
-
-
 class ComplaintFormSection4CrimeFacts(BaseModel):
     """4. 범죄 사실."""
 
@@ -197,9 +188,6 @@ class ComplaintFormSection8Other(BaseModel):
 class ComplaintFormSubmissionFooter(BaseModel):
     """제출일·서명·제출처(하단)."""
 
-    date_year: int | None = Field(default=None, description="하단 — 제출일(년)")
-    date_month: int | None = Field(default=None, description="하단 — 제출일(월)")
-    date_day: int | None = Field(default=None, description="하단 — 제출일(일)")
     accuser_name: str | None = Field(default=None, description="하단 — 고소인 성명(인)")
     submitter_name: str | None = Field(default=None, description="하단 — 제출인 성명(인)")
     submission_target_police_station: str | None = Field(
@@ -218,10 +206,6 @@ class ComplaintFormData(BaseModel):
     section_2_accused: ComplaintFormSection2Accused = Field(
         default_factory=ComplaintFormSection2Accused,
         description="2. 피고소인",
-    )
-    section_3_complaint_purpose: ComplaintFormSection3ComplaintPurpose = Field(
-        default_factory=ComplaintFormSection3ComplaintPurpose,
-        description="3. 고소 취지",
     )
     section_4_crime_facts: ComplaintFormSection4CrimeFacts = Field(
         default_factory=ComplaintFormSection4CrimeFacts,
@@ -256,9 +240,6 @@ class StatementFormData(BaseModel):
         default=None,
         description="피해 사실 진술(필수 입력란 본문)",
     )
-    date_year: int | None = Field(default=None, description="작성 일자 — 연(년)")
-    date_month: int | None = Field(default=None, description="작성 일자 — 월")
-    date_day: int | None = Field(default=None, description="작성 일자 — 일")
     declarant_name: str | None = Field(default=None, description="진술인 성명(인)")
     submission_target_police_station: str | None = Field(
         default=None,
