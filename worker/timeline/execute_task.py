@@ -59,8 +59,15 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
     )
 
     # 긴 LLM 동안 유휴였던 바깥 세션 연결은 끊겼을 수 있음 → 풀에서 새 연결을 쓰도록 정리 후 task 재조회
+    try:
+        db.rollback()
+    except Exception:
+        pass
+    try:
+        db.connection().invalidate()
+    except Exception:
+        pass
     db.rollback()
-    db.connection().invalidate()
     db.expire_all()
     task = db.get(Task, task_id)
     if task is None:
