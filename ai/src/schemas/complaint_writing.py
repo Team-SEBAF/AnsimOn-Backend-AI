@@ -11,7 +11,6 @@ TagType = Literal[
     "refusal",
 ]
 
-
 class ComplaintWritingTimelineItem(BaseModel):
     title: str
     description: Optional[str] = None
@@ -19,16 +18,13 @@ class ComplaintWritingTimelineItem(BaseModel):
     is_ai_original: bool
     referenced_evidence_ids: List[UUID] = Field(default_factory=list)
 
-
 class ComplaintWritingEvent(BaseModel):
     time: str
     evidences: List[ComplaintWritingTimelineItem]
 
-
 class ComplaintWritingDateItem(BaseModel):
     date: str
     events: List[ComplaintWritingEvent]
-
 
 class ComplaintWritingStructuredContext(BaseModel):
     evidence_id: UUID
@@ -43,18 +39,15 @@ class ComplaintWritingStructuredContext(BaseModel):
     impact_on_victim: List[str] = Field(default_factory=list)
     report_or_record: Optional[str] = None
 
-
 class ComplaintWritingAiInput(BaseModel):
     complaint_id: UUID
     items: List[ComplaintWritingDateItem]
     structured_contexts: Optional[List[ComplaintWritingStructuredContext]] = None
 
-
 class ComplaintDocumentOutput(BaseModel):
     section_4_crime_facts: str
     section_5_complaint_reason: str
     section_6_evidence_list_text: List[str]
-
 
 class DamageFactsStatementOutput(BaseModel):
     damage_facts_statement: str
