@@ -1,23 +1,29 @@
 import json
+from uuid import UUID
 
 from botocore.exceptions import ClientError
 from sqlalchemy import select
 
 from ansimon_ai.caching.db import SessionLocal
-from ansimon_ai.caching.models import Caching
 from ansimon_ai.caching.s3 import (
     S3_BUCKET_NAME,
     download_s3_object,
     upload_s3_object,
 )
+from shared.models.caching_model import Caching
 
 
-def cache_json(hash_key: str, json_data: dict) -> None:
+def cache_json(
+    hash_key: str,
+    json_data: dict,
+    *,
+    complaint_id: UUID,
+) -> None:
     """
     hash_key와 JSON 데이터를 받아 S3에 업로드 후 DB에 저장.
 
     - S3 경로: caching/{hash_key}
-    - DB에 hash_key, s3_key 저장
+    - DB에 hash_key, s3_key, complaint_id 저장
     """
     s3_key = f"caching/{hash_key}"
     json_body = json.dumps(json_data, ensure_ascii=False).encode("utf-8")
@@ -27,7 +33,7 @@ def cache_json(hash_key: str, json_data: dict) -> None:
     with SessionLocal() as session:
         existing = session.scalar(select(Caching).where(Caching.hash_key == hash_key))
         if existing is None:
-            session.add(Caching(hash_key=hash_key, s3_key=s3_key))
+            session.add(Caching(hash_key=hash_key, s3_key=s3_key, complaint_id=complaint_id))
             session.commit()
 
 
