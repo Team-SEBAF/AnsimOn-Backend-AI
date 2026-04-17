@@ -1,4 +1,3 @@
-#!/bin/bash
 # testset-cases.tar.part-* 분할본을 이어 붙여 testset/ 아래에 풀기
 
 set -euo pipefail
