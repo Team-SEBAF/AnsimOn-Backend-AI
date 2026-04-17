@@ -8,6 +8,7 @@ from shared.core.database import SessionLocal
 from shared.models import Task
 from worker.json_sanitize import strip_json_null_chars
 from worker.timeline.ai_input_builder import build_ai_input
+from worker.timeline.json_cache import JsonCache
 from worker.timeline.save_output import save_output
 
 logger = logging.getLogger(__name__)
@@ -52,10 +53,13 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
         logger.info("증거 처리 진행 (task_id: %s): (%d/%d)", task_id, processed, total_count)
 
     logger.info("타임라인 AI 실행 시작 (task_id: %s) (llm_type: %s)", task.id, llm_type)
+
+    cache = JsonCache(complaint_id=complaint_id)
     output = build_timeline_prototype(
         ai_input,
         llm_client=llm_client,
         progress_callback=_on_progress,
+        cache=cache,
     )
 
     # 긴 LLM 동안 유휴였던 바깥 세션 연결은 끊겼을 수 있음 → 풀에서 새 연결을 쓰도록 정리 후 task 재조회

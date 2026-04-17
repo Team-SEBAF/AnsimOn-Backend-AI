@@ -19,3 +19,10 @@ __pycache__/
 /data
 /logs
 /scripts/timeline_sse_stream.py
+
+# testset: 케이스 원본 폴더는 커밋하지 않음. 분할 아카이브는 testset-cases.tar.part-* (scripts/pack_testset.sh)
+testset/*
+!testset/set_mtime.py
+# pack 중간 산출물·구버전 단일 파일 실수 커밋 방지
+testset-cases.tar
+testset-cases.tar.gz
