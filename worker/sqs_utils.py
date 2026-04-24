@@ -54,6 +54,10 @@ def process_message(
         # 2. AI 실행 + 결과 저장
         execute_task(task, db)  # execute_task 안에서 task.status 변경 하지 않기
 
+        db.refresh(task)
+        if task.status != TaskStatus.PROCESSING:
+            return True
+
         # 3. 상태 변경 (DONE)
         task.status = TaskStatus.DONE
         task.completed_at = datetime.now(timezone.utc)

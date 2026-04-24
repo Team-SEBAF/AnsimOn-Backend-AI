@@ -53,6 +53,7 @@ def build_timeline_prototype(
     cache: Optional[object] = None,
     model_version: str = DEFAULT_MODEL_VERSION,
     progress_callback: Optional[Callable[[int, int], None]] = None,
+    cancel_callback: Optional[Callable[[], bool]] = None,
     victim_video_frame_interval_seconds: int = 3,
 ) -> TimelinePrototypeOutput:
     if anchor_matcher is None:
@@ -74,6 +75,8 @@ def build_timeline_prototype(
     evidence_results: List[EvidenceProcessingResult] = []
 
     for i, ev in enumerate(ai_input.evidences):
+        if cancel_callback is not None and cancel_callback():
+            break
         result = process_one(ev)
         if result is not None:
             evidence_results.append(result)

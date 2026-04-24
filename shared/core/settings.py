@@ -32,6 +32,9 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o-mini"
+    OCR_ENGINE: str | None = None
+    CLOVA_OCR_INVOKE_URL: str | None = None
+    CLOVA_OCR_SECRET: str | None = None
 
     @field_validator("CORS_ORIGINS", mode="after")
     @classmethod

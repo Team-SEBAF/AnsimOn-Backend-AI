@@ -26,6 +26,7 @@ class TaskStatus(str, Enum):
     PROCESSING = "PROCESSING"
     DONE = "DONE"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 
 class Task(Base):
