@@ -36,15 +36,21 @@ def _apply_meridiem(hour: int, meridiem: Optional[str]) -> int:
         return 0
     return hour
 
-def _extract_date_parts(text: str) -> Optional[tuple[int, int, int]]:
+def _extract_date_match(text: str) -> Optional[re.Match[str]]:
     for pattern in _DATE_PATTERNS:
         match = pattern.search(text)
         if match:
-            return int(match.group(1)), int(match.group(2)), int(match.group(3))
+            return match
     return None
 
-def _extract_time_parts(text: str) -> Optional[tuple[int, int]]:
-    match = _TIME_PATTERN.search(text)
+def _extract_date_parts(text: str) -> Optional[tuple[int, int, int]]:
+    match = _extract_date_match(text)
+    if match is None:
+        return None
+    return int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+def _extract_time_parts(text: str, *, start: int = 0) -> Optional[tuple[int, int]]:
+    match = _TIME_PATTERN.search(text, pos=start)
     if not match:
         return None
 
@@ -74,11 +80,16 @@ def extract_timestamp(text: str, fallback: Optional[datetime] = None) -> Optiona
         hour = _apply_meridiem(hour, meridiem)
         return _build_datetime(year, month, day, hour, minute)
 
-    date_parts = _extract_date_parts(normalized)
-    if date_parts is None:
+    date_match = _extract_date_match(normalized)
+    if date_match is None:
         return fallback
 
-    time_parts = _extract_time_parts(normalized)
+    date_parts = (
+        int(date_match.group(1)),
+        int(date_match.group(2)),
+        int(date_match.group(3)),
+    )
+    time_parts = _extract_time_parts(normalized, start=date_match.end())
     if time_parts is None:
         return _build_datetime(*date_parts)
 

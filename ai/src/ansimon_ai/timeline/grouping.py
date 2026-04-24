@@ -1,10 +1,18 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import NAMESPACE_URL, uuid5
+
+KST = timezone(timedelta(hours=9))
 
 def _to_date_time_str(ts: Optional[datetime]) -> Tuple[str, str]:
     if ts is None:
         return "UNKNOWN", "00:00"
+    
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=KST)
+    else:
+        ts = ts.astimezone(KST)
+        
     return ts.strftime("%Y-%m-%d"), ts.strftime("%H:%M")
 
 def _message_group_key(evidence: Dict[str, Any]) -> str:
