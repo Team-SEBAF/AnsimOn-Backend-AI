@@ -5,32 +5,113 @@ from typing import Optional
 
 from .types import OCRResult
 from .types import OCRSegment
+from .clova_ocr import clova_ocr_image_to_result
 
 from ansimon_ai.structuring.types import StructuringInput, StructuringSegment
 from ansimon_ai.structuring.timestamp_utils import extract_timestamp
 
+_UI_EDGE_CHARS = "<>=_+-@…·|~ "
+_UI_ONLY_VALUES = {"글", "메시지 입력", "message"}
+_TIME_ONLY_PATTERN = re.compile(r"^(?:(?:오전|오후)\s*)?\d{1,2}:\d{2}$")
+_DATE_ONLY_PATTERN = re.compile(r"^\d{4}\s*[./년-]\s*\d{1,2}\s*[./월-]\s*\d{1,2}")
+
+def _clean_ocr_text(text: str) -> str:
+    text = " ".join(text.replace("\n", " ").replace("\r", " ").split())
+    text = text.strip()
+    if not text:
+        return ""
+
+    if all(c in "!@#$%^&*()_+=[]{}|;:'\",.<>?/\\-~…· " for c in text):
+        return ""
+
+    text = text.strip(_UI_EDGE_CHARS)
+    if not text:
+        return ""
+
+    parts = text.split()
+    while len(parts) > 1 and parts[-1] == "Q":
+        parts.pop()
+    text = " ".join(parts).strip(_UI_EDGE_CHARS)
+
+    if text.lower() in _UI_ONLY_VALUES:
+        return ""
+
+    return text
+
 def preprocess_ocr_segments(segments):
     processed = []
     for seg in segments:
-        text = seg.text.strip()
-        if not text or all(c in "!@#$%^&*()_+=[]{}|;:'\",.<>?/\\ " for c in text):
+        raw_text = _clean_ocr_text(seg.text)
+        if not raw_text:
             continue
-        text = " ".join(text.replace("\n", " ").replace("\r", " ").split())
+        text = raw_text
+        if not _is_time_only_text(raw_text):
+            text = _apply_speaker_prefix(text, seg.speaker_side)
         start = seg.start if seg.start is not None else 0.0
         end = seg.end if seg.end is not None else 0.0
-        processed.append({**seg.model_dump(), "text": text, "start": start, "end": end})
-    return processed
+        processed.append(
+            {
+                **seg.model_dump(),
+                "text": text,
+                "raw_text": raw_text,
+                "start": start,
+                "end": end,
+            }
+        )
+    return _merge_time_segments(processed)
+
+def _merge_time_segments(segments):
+    merged = []
+    pending_time_text = None
+    for seg in segments:
+        raw_text = seg.get("raw_text") or seg.get("text", "")
+        if _is_time_only_text(raw_text):
+            target = _find_time_attachment_target(merged)
+            if target is not None:
+                target["text"] = f'{target["text"]} [시각: {raw_text}]'
+            else:
+                pending_time_text = raw_text
+            continue
+
+        if pending_time_text and not _is_date_only_text(raw_text):
+            seg["text"] = f'{seg["text"]} [시각: {pending_time_text}]'
+            pending_time_text = None
+
+        merged.append(seg)
+    return merged
+
+def _find_time_attachment_target(segments):
+    for seg in reversed(segments):
+        raw_text = seg.get("raw_text") or seg.get("text", "")
+        if _is_date_only_text(raw_text):
+            continue
+        return seg
+    return None
+
+def _is_time_only_text(text: str) -> bool:
+    return bool(_TIME_ONLY_PATTERN.fullmatch(text.strip()))
+
+def _is_date_only_text(text: str) -> bool:
+    return bool(_DATE_ONLY_PATTERN.match(text.strip()))
+
+def _apply_speaker_prefix(text: str, speaker_side: Optional[str]) -> str:
+    if speaker_side == "left":
+        return f"[상대방] {text}"
+    if speaker_side == "right":
+        return f"[피해자] {text}"
+    return text
 
 def build_structuring_input_from_ocr(
     ocr: OCRResult,
     metadata_fallback_timestamp: Optional[datetime] = None,
 ) -> StructuringInput:
     segments = preprocess_ocr_segments(ocr.segments)
+    full_text = "\n".join(seg.get("text", "") for seg in segments).strip()
     return StructuringInput(
         modality="text",
         source_type="ocr",
         language=ocr.language,
-        full_text=ocr.full_text,
+        full_text=full_text or ocr.full_text,
         segments=[
             StructuringSegment(
                 text=seg.get("text", ""),
@@ -133,7 +214,7 @@ def _run_ocr_variant(pytesseract, output_cls, image, *, lang: str, config: str, 
         engine=engine_name,
     )
 
-def ocr_image_to_result(image_path: str) -> OCRResult:
+def tesseract_ocr_image_to_result(image_path: str) -> OCRResult:
     import pytesseract
     from PIL import Image
 
@@ -163,3 +244,22 @@ def ocr_image_to_result(image_path: str) -> OCRResult:
 
     assert best_result is not None
     return best_result
+
+def ocr_image_to_result(image_path: str, *, engine: Optional[str] = None) -> OCRResult:
+    resolved_engine = _resolve_ocr_engine(engine)
+    if resolved_engine == "clova":
+        return clova_ocr_image_to_result(image_path)
+    if resolved_engine == "tesseract":
+        return tesseract_ocr_image_to_result(image_path)
+    raise ValueError(f"Unsupported OCR engine: {resolved_engine}")
+
+def _resolve_ocr_engine(engine: Optional[str]) -> str:
+    try:
+        from dotenv import load_dotenv
+    except ModuleNotFoundError:
+        load_dotenv = None
+
+    if load_dotenv is not None:
+        load_dotenv()
+
+    return (engine or os.getenv("OCR_ENGINE") or "tesseract").strip().lower()

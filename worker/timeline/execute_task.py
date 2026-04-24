@@ -1,11 +1,13 @@
 import json
 import logging
+from datetime import datetime, timezone
 
 from schemas.timeline_inputs import TimelinePrototypeOutput
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from shared.core.database import SessionLocal
-from shared.models import Task
+from shared.models import Task, TaskStatus, TaskType
 from worker.json_sanitize import strip_json_null_chars
 from worker.timeline.ai_input_builder import build_ai_input
 from worker.timeline.json_cache import JsonCache
@@ -52,6 +54,34 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
                 progress_db.commit()
         logger.info("증거 처리 진행 (task_id: %s): (%d/%d)", task_id, processed, total_count)
 
+    def _should_cancel() -> bool:
+        with SessionLocal() as cancel_db:
+            current = cancel_db.get(Task, task_id)
+            if current is not None:
+                stmt = (
+                    select(Task.id)
+                    .where(
+                        and_(
+                            Task.complaint_id == complaint_id,
+                            Task.type == TaskType.TIMELINE,
+                            Task.id != task_id,
+                            Task.created_at > current.created_at,
+                        )
+                    )
+                    .limit(1)
+                )
+                newer_exists = cancel_db.execute(stmt).scalar_one_or_none() is not None
+                if newer_exists:
+                    current.status = TaskStatus.CANCELLED
+                    current.completed_at = datetime.now(timezone.utc)
+                    cancel_db.commit()
+                    logger.info(
+                        "태스크 취소 완료되었습니다. (task_id: %s)",
+                        task_id,
+                    )
+                    return True
+                return current.status == TaskStatus.CANCELLED
+
     logger.info("타임라인 AI 실행 시작 (task_id: %s) (llm_type: %s)", task.id, llm_type)
 
     cache = JsonCache(complaint_id=complaint_id)
@@ -59,6 +89,7 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
         ai_input,
         llm_client=llm_client,
         progress_callback=_on_progress,
+        cancel_callback=_should_cancel,
         cache=cache,
     )
 
@@ -76,6 +107,10 @@ def execute_timeline_task(task: Task, db: Session, *, llm_type: str = "mock") ->
     task = db.get(Task, task_id)
     if task is None:
         raise RuntimeError(f"태스크를 찾을 수 없습니다 (task_id: {task_id})")
+        
+    if task.status == TaskStatus.CANCELLED:
+        logger.info("취소된 timeline 태스크 종료 (task_id: %s)", task_id)
+        return
 
     # 4. 증거 결과 로깅
     for r in output.evidence_results:
