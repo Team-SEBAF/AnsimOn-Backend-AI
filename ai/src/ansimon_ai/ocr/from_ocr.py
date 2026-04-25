@@ -1,14 +1,20 @@
 import os
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
+
+from PIL import Image as PILImage
 
 from .types import OCRResult
 from .types import OCRSegment
 from .clova_ocr import clova_ocr_image_to_result
+from .table_formatting import format_ocr_result_text, is_tabular_table
 
 from ansimon_ai.structuring.types import StructuringInput, StructuringSegment
 from ansimon_ai.structuring.timestamp_utils import extract_timestamp
+
+ImageInput = str | Path | PILImage.Image
 
 _UI_EDGE_CHARS = "<>=_+-@…·|~ "
 _UI_ONLY_VALUES = {"글", "메시지 입력", "message"}
@@ -106,7 +112,7 @@ def build_structuring_input_from_ocr(
     metadata_fallback_timestamp: Optional[datetime] = None,
 ) -> StructuringInput:
     segments = preprocess_ocr_segments(ocr.segments)
-    full_text = "\n".join(seg.get("text", "") for seg in segments).strip()
+    full_text = _build_ocr_full_text(ocr, segments)
     return StructuringInput(
         modality="text",
         source_type="ocr",
@@ -125,6 +131,15 @@ def build_structuring_input_from_ocr(
             for seg in segments
         ],
     )
+
+def _build_ocr_full_text(ocr: OCRResult, segments: list[dict]) -> str:
+    if any(is_tabular_table(table) for table in ocr.tables):
+        formatted_text = format_ocr_result_text(ocr).strip()
+        if formatted_text:
+            return formatted_text
+
+    processed_text = "\n".join(seg.get("text", "") for seg in segments).strip()
+    return processed_text or ocr.full_text
 
 def _prepare_ocr_variants(image):
     from PIL import ImageFilter, ImageOps
@@ -214,15 +229,18 @@ def _run_ocr_variant(pytesseract, output_cls, image, *, lang: str, config: str, 
         engine=engine_name,
     )
 
-def tesseract_ocr_image_to_result(image_path: str) -> OCRResult:
+def tesseract_ocr_image_to_result(
+    image_input: ImageInput,
+    *,
+    lang: str = "kor+eng",
+) -> OCRResult:
     import pytesseract
-    from PIL import Image
 
     tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     if os.name == "nt" and os.path.exists(tesseract_cmd):
         pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
 
-    image = Image.open(image_path)
+    image = _load_image_input(image_input)
     variants = _prepare_ocr_variants(image)
 
     best_result: OCRResult | None = None
@@ -233,7 +251,7 @@ def tesseract_ocr_image_to_result(image_path: str) -> OCRResult:
             pytesseract,
             pytesseract.Output,
             variant_image,
-            lang="kor+eng",
+            lang=lang,
             config=config,
             engine_name=f"tesseract:{variant_name}",
         )
@@ -245,13 +263,41 @@ def tesseract_ocr_image_to_result(image_path: str) -> OCRResult:
     assert best_result is not None
     return best_result
 
-def ocr_image_to_result(image_path: str, *, engine: Optional[str] = None) -> OCRResult:
+def ocr_image_to_result(
+    image_input: ImageInput,
+    *,
+    engine: Optional[str] = None,
+    lang: Optional[str] = None,
+) -> OCRResult:
     resolved_engine = _resolve_ocr_engine(engine)
     if resolved_engine == "clova":
-        return clova_ocr_image_to_result(image_path)
+        if lang is None:
+            return clova_ocr_image_to_result(image_input)
+        return clova_ocr_image_to_result(image_input, lang=_normalize_clova_lang(lang))
     if resolved_engine == "tesseract":
-        return tesseract_ocr_image_to_result(image_path)
+        if lang is None:
+            return tesseract_ocr_image_to_result(image_input)
+        return tesseract_ocr_image_to_result(image_input, lang=lang)
     raise ValueError(f"Unsupported OCR engine: {resolved_engine}")
+
+def _load_image_input(image_input: ImageInput) -> PILImage.Image:
+    if isinstance(image_input, PILImage.Image):
+        return image_input.copy()
+
+    with PILImage.open(image_input) as image:
+        return image.copy()
+
+def _normalize_clova_lang(lang: str) -> str:
+    token = lang.split("+", 1)[0].strip().lower()
+    mapping = {
+        "ko": "ko",
+        "kor": "ko",
+        "en": "en",
+        "eng": "en",
+        "ja": "ja",
+        "jpn": "ja",
+    }
+    return mapping.get(token, token)
 
 def _resolve_ocr_engine(engine: Optional[str]) -> str:
     try:

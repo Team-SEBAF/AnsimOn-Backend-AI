@@ -7,6 +7,7 @@ class StructuringSegment(BaseModel):
     start: float
     end: float
     timestamp: Optional[datetime] = None
+    speaker: Optional[str] = None
     
 class StructuringInput(BaseModel):
     modality: Literal["text"]

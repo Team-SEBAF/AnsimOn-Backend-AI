@@ -29,6 +29,7 @@ def build_structuring_messages(struct_input: StructuringInput) -> list[dict]:
         ensure_ascii=False,
         indent=2,
     )
+    speaker_section = _build_speaker_attribution_section(struct_input)
 
     return [
         {
@@ -38,6 +39,7 @@ def build_structuring_messages(struct_input: StructuringInput) -> list[dict]:
         {
             "role": "user",
             "content": (
+                f"{speaker_section}"
                 "### INPUT TEXT (anchor base)\n\n"
                 f"{struct_input.full_text}\n\n"
                 "### SEGMENTS (json)\n\n"
@@ -45,6 +47,59 @@ def build_structuring_messages(struct_input: StructuringInput) -> list[dict]:
             ),
         },
     ]
+
+def _build_speaker_attribution_section(struct_input: StructuringInput) -> str:
+    if struct_input.source_type != "stt":
+        return ""
+
+    if not any(segment.speaker for segment in struct_input.segments):
+        return ""
+
+    note = (
+        "### SPEAKER ATTRIBUTION NOTE\n\n"
+        "Use speaker labels in INPUT TEXT and SEGMENTS as the primary source for "
+        "speaker attribution. Same speaker labels indicate the same speaker across "
+        "turns. Do not use the raw labels in the final Korean summary.\n\n"
+    )
+    single_speaker_note = _build_single_speaker_note(struct_input)
+    transcript = _build_speaker_labeled_transcript(struct_input)
+    if _full_text_has_speaker_labels(struct_input) or not transcript:
+        return f"{note}{single_speaker_note}"
+
+    return f"{note}{single_speaker_note}### SPEAKER-LABELED TRANSCRIPT (context only)\n\n{transcript}\n\n"
+
+def _build_single_speaker_note(struct_input: StructuringInput) -> str:
+    speakers = {
+        segment.speaker
+        for segment in struct_input.segments
+        if segment.speaker
+    }
+    if len(speakers) != 1:
+        return ""
+
+    return (
+        "This STT input has one detected speaker only. Unless the input clearly says "
+        "this is the victim's own voice memo, refer to this speaker as `상대방` in "
+        "the final Korean summary. Do not use `화자`, `발화자`, `말한 사람`, or "
+        "`한쪽` for this single-speaker voice evidence.\n\n"
+    )
+
+def _build_speaker_labeled_transcript(struct_input: StructuringInput) -> str:
+    lines = []
+    for segment in struct_input.segments:
+        if not segment.speaker:
+            continue
+        start = f"{segment.start:.2f}"
+        end = f"{segment.end:.2f}"
+        lines.append(f"[{start}-{end}] {segment.speaker}: {segment.text}")
+
+    return "\n".join(lines)
+
+def _full_text_has_speaker_labels(struct_input: StructuringInput) -> bool:
+    return any(
+        segment.speaker and f"{segment.speaker}:" in struct_input.full_text
+        for segment in struct_input.segments
+    )
 
 def build_complaint_document_messages(
     ai_input: ComplaintWritingAiInput,

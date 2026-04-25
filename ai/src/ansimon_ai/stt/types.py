@@ -5,6 +5,7 @@ class STTSegment(BaseModel):
     start: float
     end: float
     text: str
+    speaker: Optional[str] = None
 
 class STTResult(BaseModel):
     full_text: str

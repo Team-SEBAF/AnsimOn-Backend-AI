@@ -42,6 +42,15 @@ class Timeline(Base):
         default=True,
         comment="타임라인 PDF 재생성 필요 여부",
     )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
 
 class TimelineEvidence(Base):
