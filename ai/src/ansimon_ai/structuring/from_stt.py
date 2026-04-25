@@ -19,6 +19,7 @@ def build_structuring_input_from_stt(
                 text=seg.text,
                 start=seg.start,
                 end=seg.end,
+                speaker=seg.speaker,
                 timestamp=extract_timestamp(seg.text, fallback=metadata_fallback_timestamp),
             )
             for seg in stt.segments

@@ -1,5 +1,6 @@
-from pydantic import BaseModel
 from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 class OCRVertex(BaseModel):
     x: float
@@ -51,8 +52,40 @@ class OCRSegment(BaseModel):
             return None
         return (self.min_y + self.max_y) / 2.0
 
+
+class OCRTableWord(BaseModel):
+    text: str
+    confidence: Optional[float] = None
+    vertices: Optional[List[OCRVertex]] = None
+
+
+class OCRTableLine(BaseModel):
+    text: str
+    confidence: Optional[float] = None
+    vertices: Optional[List[OCRVertex]] = None
+    words: List[OCRTableWord] = Field(default_factory=list)
+
+
+class OCRTableCell(BaseModel):
+    text: str
+    row_index: int
+    column_index: int
+    row_span: int = 1
+    column_span: int = 1
+    confidence: Optional[float] = None
+    vertices: Optional[List[OCRVertex]] = None
+    lines: List[OCRTableLine] = Field(default_factory=list)
+
+
+class OCRTable(BaseModel):
+    text: str = ""
+    confidence: Optional[float] = None
+    vertices: Optional[List[OCRVertex]] = None
+    cells: List[OCRTableCell] = Field(default_factory=list)
+
 class OCRResult(BaseModel):
     full_text: str
     segments: List[OCRSegment]
     language: Optional[str] = None
     engine: str
+    tables: List[OCRTable] = Field(default_factory=list)
