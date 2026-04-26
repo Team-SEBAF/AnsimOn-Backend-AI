@@ -1,4 +1,5 @@
 import os
+import warnings
 from .base import STTEngine
 from .diarization import assign_speakers_to_stt_segments
 from .pyannote_diarization import PyannoteDiarizer
@@ -30,7 +31,15 @@ class WhisperSTT(STTEngine):
         if self.diarizer is None:
             return stt_result
 
-        diarization_segments = self.diarizer.diarize(audio_path)
+        try:
+            diarization_segments = self.diarizer.diarize(audio_path)
+        except Exception as exc:
+            warnings.warn(
+                f"Diarization failed; returning Whisper STT result without speaker labels: {exc}",
+                RuntimeWarning,
+            )
+            return stt_result
+
         return assign_speakers_to_stt_segments(stt_result, diarization_segments)
 
 def _resolve_diarizer():
@@ -38,5 +47,12 @@ def _resolve_diarizer():
     if engine in {"", "none", "off", "false"}:
         return None
     if engine == "pyannote":
-        return PyannoteDiarizer()
+        try:
+            return PyannoteDiarizer()
+        except Exception as exc:
+            warnings.warn(
+                f"Pyannote diarization is disabled because initialization failed: {exc}",
+                RuntimeWarning,
+            )
+            return None
     raise ValueError(f"Unsupported diarization engine: {engine}")
