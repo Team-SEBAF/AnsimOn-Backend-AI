@@ -7,6 +7,7 @@ from typing import Callable
 from ansimon_ai.structuring.cache.hash import compute_input_hash
 from ansimon_ai.structuring.types import StructuringInput, StructuringResult
 from ansimon_ai.structuring.tags.types import EvidenceTag
+from ansimon_ai.structuring.versions import PROMPT_VERSION, SCHEMA_VERSION
 from ansimon_ai.trial.signals_v0.generate import generate_trial_signals_v0_from_structuring
 from ansimon_ai.trial.signals_v0.storage import load_json, save_json
 from ansimon_ai.trial.signals_v0.types import TrialSignalsOutputV0
@@ -43,8 +44,8 @@ def get_or_create_trial_signals_v0_from_structuring(
     struct_input: StructuringInput,
     result: StructuringResult,
     tags: list[EvidenceTag],
-    schema_version: str = "v1.3",
-    prompt_version: str = "v1.0",
+    schema_version: str = SCHEMA_VERSION,
+    prompt_version: str = PROMPT_VERSION,
     trial_version: str = "v0",
     max_evidence: int = 3,
     full_text_max_chars: int = 1000,

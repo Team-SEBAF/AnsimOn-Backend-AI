@@ -21,16 +21,11 @@ fi
 
 BACKUP_DIR="$(mktemp -d)"
 
-# Backend-AI에서만 수정한 경로는 클론으로 덮어쓰지 않도록 백업
-if [ -d "ai/src/ansimon_ai/caching" ]; then
-  echo "📦 백업: ansimon_ai/caching/"
+# Backend-AI에서만 수정한 파일은 클론으로 덮어쓰지 않도록 백업
+if [ -f "ai/src/ansimon_ai/caching/caching.py" ]; then
+  echo "📦 백업: ansimon_ai/caching/caching.py"
   mkdir -p "$BACKUP_DIR/caching"
-  cp -a ai/src/ansimon_ai/caching/. "$BACKUP_DIR/caching/"
-fi
-if [ -f "ai/src/ansimon_ai/structuring/cache/manager.py" ]; then
-  echo "📦 백업: ansimon_ai/structuring/cache/manager.py"
-  mkdir -p "$BACKUP_DIR/structuring_cache"
-  cp -a ai/src/ansimon_ai/structuring/cache/manager.py "$BACKUP_DIR/structuring_cache/"
+  cp -a ai/src/ansimon_ai/caching/caching.py "$BACKUP_DIR/caching/"
 fi
 
 echo "🧹 기존 ai 폴더 제거"
@@ -42,15 +37,10 @@ mkdir -p ai
 mv ai_temp/src ai/
 rm -rf ai_temp
 
-if [ -d "$BACKUP_DIR/caching" ]; then
-  echo "♻️  복원: ansimon_ai/caching/"
+if [ -f "$BACKUP_DIR/caching/caching.py" ]; then
+  echo "♻️  복원: ansimon_ai/caching/caching.py"
   mkdir -p ai/src/ansimon_ai/caching
-  cp -a "$BACKUP_DIR/caching/." ai/src/ansimon_ai/caching/
-fi
-if [ -f "$BACKUP_DIR/structuring_cache/manager.py" ]; then
-  echo "♻️  복원: ansimon_ai/structuring/cache/manager.py"
-  mkdir -p ai/src/ansimon_ai/structuring/cache
-  cp -a "$BACKUP_DIR/structuring_cache/manager.py" ai/src/ansimon_ai/structuring/cache/
+  cp -a "$BACKUP_DIR/caching/caching.py" ai/src/ansimon_ai/caching/
 fi
 
 rm -rf "$BACKUP_DIR"

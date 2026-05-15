@@ -12,10 +12,8 @@ from ansimon_ai.structuring.anchor.apply import apply_anchors
 from ansimon_ai.structuring.anchor.store import collect_anchors, save_anchors
 from ansimon_ai.structuring.tags.generate import generate_evidence_tags
 from ansimon_ai.structuring.tags.types import EvidenceTag
+from ansimon_ai.structuring.versions import PROMPT_VERSION, SCHEMA_VERSION
 from ansimon_ai.trial.signals_v0.cache_manager import get_or_create_trial_signals_v0_from_structuring
-
-SCHEMA_VERSION = "v1.5"
-PROMPT_VERSION = "v1.2"
 
 def run_structuring_pipeline(
         *,
