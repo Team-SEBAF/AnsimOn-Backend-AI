@@ -24,6 +24,7 @@ def get_or_create_structured_result(
     call_fn: Callable[[StructuringInput], dict],
     *,
     complaint_id: UUID | None = None,
+    evidence_id: UUID | None = None,
     schema_version: str = SCHEMA_VERSION,
     prompt_version: str = PROMPT_VERSION,
     storage_path_fn: Callable[[str, str], Path] | None = None,
@@ -32,6 +33,7 @@ def get_or_create_structured_result(
         struct_input,
         schema_version=schema_version,
         prompt_version=prompt_version,
+        evidence_id=evidence_id,
     )
 
     is_local = os.getenv("ENV") == "local"
@@ -53,6 +55,7 @@ def get_or_create_structured_result(
         "_metadata": {
             "schema_version": schema_version,
             "prompt_version": prompt_version,
+            "evidence_id": str(evidence_id) if evidence_id is not None else None,
             "input_hash": input_hash,
             "created_at": datetime.now(timezone.utc).isoformat(),
         },

@@ -162,6 +162,7 @@ def process_single_evidence(
                 llm_client=llm_client,
                 anchor_matcher=anchor_matcher,
                 validator=validator,
+                evidence_id=evidence.evidence_id,
                 cache=cache,
             )
         except Exception as exc:

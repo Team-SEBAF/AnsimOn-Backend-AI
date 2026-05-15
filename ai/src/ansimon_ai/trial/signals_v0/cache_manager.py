@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
+from uuid import UUID
 
 from ansimon_ai.structuring.cache.hash import compute_input_hash
 from ansimon_ai.structuring.types import StructuringInput, StructuringResult
@@ -44,6 +45,7 @@ def get_or_create_trial_signals_v0_from_structuring(
     struct_input: StructuringInput,
     result: StructuringResult,
     tags: list[EvidenceTag],
+    evidence_id: UUID | None = None,
     schema_version: str = SCHEMA_VERSION,
     prompt_version: str = PROMPT_VERSION,
     trial_version: str = "v0",
@@ -58,6 +60,7 @@ def get_or_create_trial_signals_v0_from_structuring(
         struct_input,
         schema_version=schema_version,
         prompt_version=prompt_version,
+        evidence_id=evidence_id,
     )
 
     limits_tag = _trial_limits_tag(
@@ -88,6 +91,7 @@ def get_or_create_trial_signals_v0_from_structuring(
         "_metadata": {
             "schema_version": schema_version,
             "prompt_version": prompt_version,
+            "evidence_id": str(evidence_id) if evidence_id is not None else None,
             "trial_version": trial_version,
             "mode": "evidence",
             "input_hash": input_hash,
