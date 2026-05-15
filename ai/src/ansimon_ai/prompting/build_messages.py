@@ -158,6 +158,7 @@ def build_victim_image_messages(
         "If the image suggests bruising, injury, physical force, or sexual misconduct, describe it as an observation only.",
         "If visible date or time text appears in the image, use it when relevant.",
         "Because this is an image-first input, evidence_span and evidence_anchor may be null when no reliable text span exists.",
+        "For visible injury marks, describe only the visible bruise or discoloration itself, such as its body location, shape, and color. Do not mention fingers, hands, or nearby gestures, and do not add sentences saying the exact body part, cause, or timing cannot be confirmed.",
         "Assign the `physical` tag only when bodily injury marks, bruising, bleeding, restraint, or strong physical force are comparatively clear in the image.",
         "Do not assign the `physical` tag for simple touch or ambiguous contact alone.",
         "Assign the `sexual_insult` tag only when sexual exposure, sexual humiliation, or unwanted sexual contact is comparatively clear in the image.",
@@ -198,16 +199,20 @@ def build_victim_video_messages(
             "type": "text",
             "text": "\n".join(
                 [
-                    "Analyze these frames from the same victim evidence video and return a single JSON object that follows the required schema.",
+                    "Analyze these still images from the same victim evidence video and return a single JSON object that follows the required schema.",
                     "All images come from one video evidence, so produce one combined result for the whole video.",
-                    "Focus only on what is visually observable across the frames.",
-                    "Do not make medical, legal, or factual conclusions beyond the video frames themselves.",
+                    "Focus only on what is visually observable across the images.",
+                    "Do not make medical, legal, or factual conclusions beyond the video images themselves.",
+                    "In the final Korean description, use natural Korean wording such as `장면` instead of `프레임` when referring to video content.",
+                    "Describe only the main incident action and the person performing it. Do not describe background people, vehicles, objects, or nearby actions that are not directly part of the incident.",
+                    "Do not use arrows, step-by-step notation, or diagram-like phrasing in the final Korean description. Describe the incident flow only in natural sentence form.",
                     "If something is unclear, use cautious language and lower confidence.",
-                    "Assign the `physical` tag only when bodily injury marks, bruising, bleeding, restraint, or strong physical force are comparatively clear in the frames.",
+                    "For visible injury marks, describe only the visible bruise or discoloration itself, such as its body location, shape, and color. Do not mention fingers, hands, or nearby gestures, and do not add sentences saying the exact body part, cause, or timing cannot be confirmed.",
+                    "Assign the `physical` tag only when bodily injury marks, bruising, bleeding, restraint, or strong physical force are comparatively clear in the images.",
                     "Do not assign the `physical` tag for simple touch or ambiguous contact alone.",
                     "Assign the `sexual_insult` tag only when sexual exposure, sexual humiliation, or unwanted sexual contact is comparatively clear in the frames.",
                     "Do not assign the `sexual_insult` tag when the sexual context is unclear or inferred only from pose or proximity.",
-                    "Because this is a video-frame input, evidence_span and evidence_anchor may be null when no reliable text span exists.",
+                    "Because this is a video-image input, evidence_span and evidence_anchor may be null when no reliable text span exists.",
                     *( [f"File name: {file_name}"] if file_name else [] ),
                 ]
             ),
@@ -218,7 +223,7 @@ def build_victim_video_messages(
         content.append(
             {
                 "type": "text",
-                "text": f"Frame at {frame.frame_timestamp_seconds} seconds",
+                "text": f"Scene at {frame.frame_timestamp_seconds} seconds",
             }
         )
         content.append(

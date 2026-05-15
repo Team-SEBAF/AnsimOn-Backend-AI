@@ -3,6 +3,21 @@
 set -e
 
 AI_REPO_URL="https://github.com/Team-SEBAF/AnsimOn-AI.git"
+BRANCH="${1:-main}"
+
+usage() {
+  echo "Usage: $0 [branch]"
+  echo "  branch  클론할 브랜치 (기본값: main)"
+  echo ""
+  echo "Examples:"
+  echo "  $0              # main 브랜치"
+  echo "  $0 develop      # develop 브랜치"
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
 
 BACKUP_DIR="$(mktemp -d)"
 
@@ -21,8 +36,8 @@ fi
 echo "🧹 기존 ai 폴더 제거"
 rm -rf ai
 
-echo "📥 AI 레포 클론 (ai/src만 유지)"
-git clone $AI_REPO_URL ai_temp
+echo "📥 AI 레포 클론 (branch: ${BRANCH}, ai/src만 유지)"
+git clone --branch "$BRANCH" --single-branch "$AI_REPO_URL" ai_temp
 mkdir -p ai
 mv ai_temp/src ai/
 rm -rf ai_temp

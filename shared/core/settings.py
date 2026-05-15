@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     CLOVA_OCR_INVOKE_URL: str | None = None
     CLOVA_OCR_SECRET: str | None = None
 
+    DIARIZATION_ENGINE: str | None = None
+    PYANNOTE_HF_TOKEN: str | None = None
+    PYANNOTE_MODEL: str | None = None
+    DIARIZATION_MIN_SPEAKERS: int | None = None
+    DIARIZATION_MAX_SPEAKERS: int | None = None
+
     @field_validator("CORS_ORIGINS", mode="after")
     @classmethod
     def _normalize_cors_origins(cls, value: str | list[str]) -> list[str]:
