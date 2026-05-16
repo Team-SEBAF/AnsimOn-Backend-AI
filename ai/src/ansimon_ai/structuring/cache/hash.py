@@ -2,6 +2,7 @@ import hashlib
 import json
 import unicodedata
 from typing import Any
+from uuid import UUID
 
 from ansimon_ai.structuring.types import StructuringInput
 
@@ -25,6 +26,7 @@ def compute_input_hash(
     *,
     schema_version: str,
     prompt_version: str,
+    evidence_id: UUID | str | None = None,
 ) -> str:
     # Ensure the payload is JSON-serializable (Pydantic models -> plain dicts)
     base_payload = {
@@ -32,6 +34,8 @@ def compute_input_hash(
         "schema_version": schema_version,
         "prompt_version": prompt_version,
     }
+    if evidence_id is not None:
+        base_payload["evidence_id"] = str(evidence_id)
 
     normalized = _normalize_payload(base_payload)
 

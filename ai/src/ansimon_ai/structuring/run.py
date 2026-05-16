@@ -1,4 +1,5 @@
 from typing import Optional
+from uuid import UUID
 from ansimon_ai.structuring.types import (
     StructuringInput,
     StructuringResult,
@@ -12,10 +13,8 @@ from ansimon_ai.structuring.anchor.apply import apply_anchors
 from ansimon_ai.structuring.anchor.store import collect_anchors, save_anchors
 from ansimon_ai.structuring.tags.generate import generate_evidence_tags
 from ansimon_ai.structuring.tags.types import EvidenceTag
+from ansimon_ai.structuring.versions import PROMPT_VERSION, SCHEMA_VERSION
 from ansimon_ai.trial.signals_v0.cache_manager import get_or_create_trial_signals_v0_from_structuring
-
-SCHEMA_VERSION = "v1.5"
-PROMPT_VERSION = "v1.2"
 
 def run_structuring_pipeline(
         *,
@@ -23,6 +22,7 @@ def run_structuring_pipeline(
         llm_client,
         anchor_matcher: AnchorMatcher,
         validator,
+        evidence_id: UUID | None = None,
         cache: Optional[object] = None,
 ) -> StructuringResult:
     cache_hit = False
@@ -34,6 +34,7 @@ def run_structuring_pipeline(
             input,
             schema_version=SCHEMA_VERSION,
             prompt_version=PROMPT_VERSION,
+            evidence_id=evidence_id,
         )
         cached_output = cache.get(cache_key)
 
@@ -108,6 +109,7 @@ def run_structuring_pipeline_with_tags(
         llm_client,
         anchor_matcher: AnchorMatcher,
         validator,
+        evidence_id: UUID | None = None,
         cache: Optional[object] = None,
 ) -> tuple[StructuringResult, list[EvidenceTag]]:
     result = run_structuring_pipeline(
@@ -115,6 +117,7 @@ def run_structuring_pipeline_with_tags(
         llm_client=llm_client,
         anchor_matcher=anchor_matcher,
         validator=validator,
+        evidence_id=evidence_id,
         cache=cache,
     )
 
@@ -127,6 +130,7 @@ def run_structuring_pipeline_with_tags_and_trial_signals_v0(
         llm_client,
         anchor_matcher: AnchorMatcher,
         validator,
+        evidence_id: UUID | None = None,
         cache: Optional[object] = None,
         max_trial_evidence: int = 3,
 ):
@@ -135,6 +139,7 @@ def run_structuring_pipeline_with_tags_and_trial_signals_v0(
         llm_client=llm_client,
         anchor_matcher=anchor_matcher,
         validator=validator,
+        evidence_id=evidence_id,
         cache=cache,
     )
 
@@ -142,6 +147,7 @@ def run_structuring_pipeline_with_tags_and_trial_signals_v0(
         struct_input=input,
         result=result,
         tags=evidence_tags,
+        evidence_id=evidence_id,
         schema_version=SCHEMA_VERSION,
         prompt_version=PROMPT_VERSION,
         max_evidence=max_trial_evidence,
