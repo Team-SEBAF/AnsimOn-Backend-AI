@@ -29,7 +29,7 @@ def build_structuring_messages(struct_input: StructuringInput) -> list[dict]:
         ensure_ascii=False,
         indent=2,
     )
-    speaker_section = _build_speaker_attribution_section(struct_input)
+    stt_section = _build_stt_context_section(struct_input)
 
     return [
         {
@@ -39,7 +39,7 @@ def build_structuring_messages(struct_input: StructuringInput) -> list[dict]:
         {
             "role": "user",
             "content": (
-                f"{speaker_section}"
+                f"{stt_section}"
                 "### INPUT TEXT (anchor base)\n\n"
                 f"{struct_input.full_text}\n\n"
                 "### SEGMENTS (json)\n\n"
@@ -48,25 +48,73 @@ def build_structuring_messages(struct_input: StructuringInput) -> list[dict]:
         },
     ]
 
-def _build_speaker_attribution_section(struct_input: StructuringInput) -> str:
+def _build_stt_context_section(struct_input: StructuringInput) -> str:
     if struct_input.source_type != "stt":
         return ""
 
+    interpretation_note = (
+        "### STT INTERPRETATION NOTE\n\n"
+        "For call or conversation evidence, summarize the ordered flow of contact, "
+        "pressure, refusal, warning, and response instead of replaying every line. "
+        "Use `피해자` or `상대방` in the final Korean title/description when the role "
+        "is clear; omit the subject only when it is unclear. Do not replace unclear "
+        "subjects with analytic phrases such as `한쪽`, `응답 측`, or `전화를 건 측`. "
+        "Do not infer the aggressor or threat evidence from swear words or reporting/"
+        "legal warnings alone. If the call involves an unknown number, another number "
+        "after blocking, or monitoring context, treat that as contact or block-bypass "
+        "context before interpreting later warnings. Korean response phrases such as "
+        "`신고한다`, `끝까지 간다`, or `고소한다` are possible defensive reporting/"
+        "legal-response language in that context. Because STT text can contain "
+        "misrecognitions, avoid direct quotation unless wording is short, clear, and "
+        "important; summarize awkward phrases as `취지의 발언`, `표현`, or `언급`.\n\n"
+    )
+    voice_description_note = (
+        "### VOICE DESCRIPTION NOTE\n\n"
+        "For the final Korean title/description, do not use analytic wording such as "
+        "`발화`, `한쪽`, `다른 쪽`, `한 사람`, `다른 사람`, `응답 측`, `발신 측`, "
+        "`수신 측`, `전화를 건 측`, or `연락받은 쪽`. Use `피해자` and `상대방` when the call flow makes the roles "
+        "clear. If someone continues contact by referencing blocked contact, no response, "
+        "a changed number/account, another number, or other bypass of avoidance, treat "
+        "that person as the contact-continuing `상대방` unless the input explicitly says "
+        "the victim initiated that contact. Reporting/legal warnings or strong refusal "
+        "against that continued contact may be the `피해자`'s defensive response. Center "
+        "the summary on the bypassed/continued contact, monitoring/contextual pressure, "
+        "and the other person's response. "
+        "Do not title or describe a victim's defensive swear words or reporting warnings "
+        "as the main incident. Summarize phrases like `신고한다` or `끝까지 간다` as "
+        "`피해자가 신고하겠다는 대응을 했습니다` when they respond to prior contact "
+        "or monitoring.\n\n"
+    )
+
     if not any(segment.speaker for segment in struct_input.segments):
-        return ""
+        return f"{interpretation_note}{voice_description_note}"
 
     note = (
         "### SPEAKER ATTRIBUTION NOTE\n\n"
         "Use speaker labels in INPUT TEXT and SEGMENTS as the primary source for "
-        "speaker attribution. Same speaker labels indicate the same speaker across "
-        "turns. Do not use the raw labels in the final Korean summary.\n\n"
+        "speaker attribution. Same labels indicate the same speaker; different labels "
+        "must not be merged into one continuous statement. Do not use raw labels in "
+        "the final Korean summary.\n\n"
+    )
+    role_note = (
+        "### SPEAKER ROLE CONSISTENCY NOTE\n\n"
+        "Relationship terms and self-references such as senior, junior, freshman, "
+        "sunbae, hoobae, `선배`, `후배`, `신입생`, `내가`, or `저는` belong only to "
+        "the speaker label that said them. Do not combine a refusal from one speaker "
+        "with another speaker's relationship justification. If ownership is unclear, "
+        "omit the relationship label and describe the safer flow, such as contact "
+        "refusal plus repeated requests for reasons. Avoid using relationship labels "
+        "as grammatical subjects when the Korean sentence can be subjectless.\n\n"
     )
     single_speaker_note = _build_single_speaker_note(struct_input)
     transcript = _build_speaker_labeled_transcript(struct_input)
     if _full_text_has_speaker_labels(struct_input) or not transcript:
-        return f"{note}{single_speaker_note}"
+        return f"{interpretation_note}{voice_description_note}{note}{role_note}{single_speaker_note}"
 
-    return f"{note}{single_speaker_note}### SPEAKER-LABELED TRANSCRIPT (context only)\n\n{transcript}\n\n"
+    return (
+        f"{interpretation_note}{voice_description_note}{note}{role_note}{single_speaker_note}"
+        f"### SPEAKER-LABELED TRANSCRIPT (context only)\n\n{transcript}\n\n"
+    )
 
 def _build_single_speaker_note(struct_input: StructuringInput) -> str:
     speakers = {
@@ -81,7 +129,8 @@ def _build_single_speaker_note(struct_input: StructuringInput) -> str:
         "This STT input has one detected speaker only. Unless the input clearly says "
         "this is the victim's own voice memo, refer to this speaker as `상대방` in "
         "the final Korean summary. Do not use `화자`, `발화자`, `말한 사람`, or "
-        "`한쪽` for this single-speaker voice evidence.\n\n"
+        "`한쪽`. Prioritize the overall contact or pressure flow over isolated swear "
+        "words.\n\n"
     )
 
 def _build_speaker_labeled_transcript(struct_input: StructuringInput) -> str:

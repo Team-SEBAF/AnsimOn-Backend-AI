@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import hashlib
 import json
+import re
 import shutil
 from collections.abc import Callable
 from functools import partial
@@ -183,7 +184,12 @@ def process_single_evidence(
             normalized_text,
             structuring_result.output_json,
         )
-        tags = _build_tags(structuring_result.output_json)
+        tags = _build_tags(
+            structuring_result.output_json,
+            evidence=evidence,
+            source_type=source_type,
+            normalized_text=normalized_text,
+        )
         timestamp = _extract_primary_timestamp(struct_input)
         if timestamp is None:
             timestamp = evidence.file_created_at
@@ -332,7 +338,9 @@ def _process_victim_evidence(
         except OSError:
             pass
 
-    description = _build_description(evidence, "", structured_data)
+    description = _clean_victim_description(
+        _build_description(evidence, "", structured_data)
+    )
     normalized_text = description or (evidence.file_name or str(evidence.evidence_id))
 
     return EvidenceProcessingResult(
@@ -496,6 +504,7 @@ def _compute_victim_cache_key(
 
     file_hash = hashlib.sha256(evidence.file_bytes).hexdigest()
     payload = {
+        "evidence_id": str(evidence.evidence_id),
         "type": evidence.type,
         "file_format": evidence.file_format,
         "file_hash": file_hash,
@@ -637,6 +646,29 @@ def _build_description(
         return text
     return f"{text[:limit].rstrip()}..."
 
+def _clean_victim_description(description: str) -> str:
+    if not description:
+        return description
+
+    sentences = [sentence.strip() for sentence in re.split(r"(?<=[.!?。！？습니다])\s+", description.strip()) if sentence.strip()]
+    if len(sentences) <= 1:
+        return "" if _is_incidental_hand_sentence(description) else description
+
+    kept = [sentence for sentence in sentences if not _is_incidental_hand_sentence(sentence)]
+    return " ".join(kept).strip()
+
+def _is_incidental_hand_sentence(sentence: str) -> bool:
+    if not _contains_any(sentence, ("손가락", "손")):
+        return False
+
+    if _contains_any(sentence, ("멍", "변색", "상처", "출혈", "부기", "붓", "찰과상")):
+        return False
+
+    return _contains_any(
+        sentence,
+        ("가리키", "짚고", "짚은", "지목", "포함", "보입니다", "나와 있습니다"),
+    )
+
 def _extract_timeline_summary(structured_data: Optional[dict]) -> dict:
     if not isinstance(structured_data, dict):
         return {}
@@ -651,7 +683,13 @@ def _extract_timeline_summary(structured_data: Optional[dict]) -> dict:
 
     return value
 
-def _build_tags(structured_data: Optional[dict]) -> List[str]:
+def _build_tags(
+    structured_data: Optional[dict],
+    *,
+    evidence: Optional[TimelinePrototypeEvidenceInput] = None,
+    source_type: Optional[str] = None,
+    normalized_text: str = "",
+) -> List[str]:
     if not isinstance(structured_data, dict):
         return []
 
@@ -666,9 +704,296 @@ def _build_tags(structured_data: Optional[dict]) -> List[str]:
     allowed = {"repeat", "physical", "threat", "sexual_insult", "refusal"}
     result: List[str] = []
     for tag in value:
-        if isinstance(tag, str) and tag in allowed and tag not in result:
-            result.append(tag)
+        if not isinstance(tag, str) or tag not in allowed or tag in result:
+            continue
+        if _should_drop_defensive_stt_threat_tag(
+            tag,
+            evidence=evidence,
+            source_type=source_type,
+            normalized_text=normalized_text,
+            structured_data=structured_data,
+        ):
+            continue
+        if _should_drop_weak_sexual_insult_tag(
+            tag,
+            normalized_text=normalized_text,
+            structured_data=structured_data,
+        ):
+            continue
+        result.append(tag)
+
+    if "refusal" not in result and _has_refusal_evidence(structured_data, normalized_text):
+        result.append("refusal")
     return result
+
+def _should_drop_weak_sexual_insult_tag(
+    tag: str,
+    *,
+    normalized_text: str,
+    structured_data: dict,
+) -> bool:
+    if tag != "sexual_insult":
+        return False
+
+    combined_text = _build_tag_context_text(structured_data, normalized_text)
+    if not combined_text:
+        return False
+
+    has_sexual_context = _contains_any(
+        combined_text,
+        (
+            "성적",
+            "성희롱",
+            "성추행",
+            "성폭력",
+            "음란",
+            "야한",
+            "몸매",
+            "가슴",
+            "엉덩이",
+            "벗어",
+            "만져",
+            "키스",
+            "자자",
+            "잘래",
+            "성관계",
+            "섹스",
+            "야동",
+        ),
+    )
+    has_direct_insult = _contains_any(
+        combined_text,
+        (
+            "미친",
+            "병신",
+            "새끼",
+            "걸레",
+            "창녀",
+            "변태",
+            "더럽",
+            "꺼져",
+            "모욕",
+        ),
+    )
+    if has_sexual_context:
+        return False
+    if has_direct_insult:
+        return _is_third_party_or_comparison_insult(combined_text)
+
+    weak_grievance_context = _contains_any(
+        combined_text,
+        (
+            "무시당",
+            "기분 나쁘",
+            "불만",
+            "대우",
+            "다른 사람",
+            "사이가 다르",
+            "관계",
+            "서운",
+            "비하",
+        ),
+    )
+    return weak_grievance_context
+
+def _is_third_party_or_comparison_insult(text: str) -> bool:
+    third_party_context = _contains_any(
+        text,
+        (
+            "특정인을 비하",
+            "특정인 비하",
+            "제3자",
+            "다른 사람",
+            "선배",
+            "걔",
+            "쟤",
+            "그 사람",
+        ),
+    )
+    comparison_grievance_context = _contains_any(
+        text,
+        (
+            "무시당",
+            "기분 나쁘",
+            "기분 더럽",
+            "불만",
+            "대우",
+            "사이가 다르",
+            "관계",
+            "서운",
+            "비교",
+        ),
+    )
+    if third_party_context and comparison_grievance_context:
+        return True
+
+    if _contains_any(
+        text,
+        (
+            "피해자를",
+            "피해자한테",
+            "너는",
+            "너를",
+            "너한테",
+            "너 같은",
+            "당신",
+        ),
+    ):
+        return False
+
+    return _contains_any(
+        text,
+        (
+            "무시당",
+            "기분 나쁘",
+            "기분 더럽",
+            "불만",
+            "대우",
+            "다른 사람",
+            "사이가 다르",
+            "관계",
+            "서운",
+            "비하",
+            "특정인",
+            "제3자",
+            "선배",
+            "걔",
+            "쟤",
+            "그 사람",
+        ),
+    )
+
+def _has_refusal_evidence(structured_data: dict, normalized_text: str) -> bool:
+    refusal_signal = structured_data.get("refusal_signal")
+    if isinstance(refusal_signal, dict) and refusal_signal.get("value") == "explicit":
+        return True
+
+    summary = _extract_timeline_summary(structured_data)
+    combined_text = " ".join(
+        value
+        for value in (summary.get("title"), summary.get("description"))
+        if isinstance(value, str)
+    )
+    return _contains_any(
+        combined_text,
+        (
+            "그만해",
+            "그만 하",
+            "그만",
+            "멈춰 달",
+            "멈춰달",
+            "멈춰",
+            "중단 요청",
+            "중단 의사",
+            "중단 요구",
+            "연락 중단",
+            "연락을 끊",
+            "연락하지 말",
+            "하지 말",
+            "하지마",
+            "거절",
+        ),
+    )
+
+def _build_tag_context_text(structured_data: dict, normalized_text: str) -> str:
+    summary = _extract_timeline_summary(structured_data)
+    summary_text = " ".join(
+        value
+        for value in (summary.get("title"), summary.get("description"))
+        if isinstance(value, str)
+    )
+    return " ".join(
+        [
+            normalized_text,
+            summary_text,
+            *_extract_structured_list_values(structured_data, "action_types"),
+            *_extract_structured_list_values(structured_data, "threat_indicators"),
+            *_extract_structured_list_values(structured_data, "impact_on_victim"),
+        ]
+    )
+
+def _should_drop_defensive_stt_threat_tag(
+    tag: str,
+    *,
+    evidence: Optional[TimelinePrototypeEvidenceInput],
+    source_type: Optional[str],
+    normalized_text: str,
+    structured_data: dict,
+) -> bool:
+    if tag != "threat":
+        return False
+    if evidence is None or evidence.type != "VOICE" or source_type != "stt":
+        return False
+
+    combined_text = " ".join(
+        [
+            normalized_text,
+            *_extract_structured_list_values(structured_data, "threat_indicators"),
+            *_extract_structured_list_values(structured_data, "action_types"),
+        ]
+    )
+    if not combined_text:
+        return False
+
+    has_block_bypass_context = _contains_any(
+        combined_text,
+        (
+            "차단",
+            "다른 번호",
+            "모르는 번호",
+            "낯선 번호",
+            "번호로 연락",
+            "번호로 전화",
+        ),
+    )
+    has_defensive_reporting = _contains_any(
+        combined_text,
+        (
+            "신고",
+            "고소",
+            "경찰",
+            "법적",
+            "끝까지 간다",
+            "끝까지 갈",
+            "끝까지 가",
+        ),
+    )
+    if not has_block_bypass_context or not has_defensive_reporting:
+        return False
+
+    return not _contains_direct_threat_expression(combined_text)
+
+def _extract_structured_list_values(structured_data: dict, key: str) -> List[str]:
+    field = structured_data.get(key)
+    if not isinstance(field, dict):
+        return []
+
+    value = field.get("value")
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    if isinstance(value, str):
+        return [value]
+    return []
+
+def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
+    return any(term in text for term in terms)
+
+def _contains_direct_threat_expression(text: str) -> bool:
+    direct_threat_terms = (
+        "죽인다",
+        "죽일",
+        "죽여",
+        "해치",
+        "뒤지게",
+        "때려",
+        "맞고싶",
+        "찾아갈",
+        "가만 안",
+        "가만두지",
+        "불이익",
+        "보복",
+    )
+    return _contains_any(text, direct_threat_terms)
 
 def _extract_primary_timestamp(struct_input: StructuringInput):
     first_timestamp = None
